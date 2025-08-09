@@ -99,7 +99,7 @@ const CheckoutForm = ({ amount, workerId, note }: { amount: number; workerId: st
 
           <button
             type="button"
-            onClick={() => setLocation(-1)}
+            onClick={() => window.history.back()}
             className="w-full py-2 text-text-secondary hover:text-text-primary transition-colors"
           >
             Back

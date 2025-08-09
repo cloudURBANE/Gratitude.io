@@ -4,6 +4,7 @@ import GradientButton from "./gradient-button";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { openPaymentApp, isMobileDevice } from "@/lib/deep-links";
 
 interface PaymentModalProps {
   worker: {
@@ -55,28 +56,53 @@ export default function PaymentModal({
   const handlePayment = async () => {
     setIsProcessing(true);
 
-    if (paymentMethod === 'venmo' && worker.venmoHandle) {
-      // Open Venmo app with pre-filled amount
-      const venmoUrl = `venmo://paycharge?txn=pay&recipients=${worker.venmoHandle}&amount=${amount}&note=Tip for ${worker.name}`;
-      window.open(venmoUrl, '_blank');
-      
-      // Also provide fallback web link
-      setTimeout(() => {
-        const webUrl = `https://venmo.com/${worker.venmoHandle}`;
-        window.open(webUrl, '_blank');
-      }, 1000);
+    // Get the appropriate handle
+    const handle = paymentMethod === 'venmo' ? worker.venmoHandle 
+                 : paymentMethod === 'cashapp' ? worker.cashappHandle
+                 : worker.zelleHandle;
 
-    } else if (paymentMethod === 'cashapp' && worker.cashappHandle) {
-      // Open Cash App with pre-filled amount
-      const cashappUrl = `https://cash.app/$${worker.cashappHandle}/${amount}`;
-      window.open(cashappUrl, '_blank');
-
-    } else if (paymentMethod === 'zelle' && worker.zelleHandle) {
-      // For Zelle, just show the handle since it doesn't support deep links
+    if (!handle) {
       toast({
-        title: "Send via Zelle",
-        description: `Send $${amount} to: ${worker.zelleHandle}`,
+        title: "Payment method not available",
+        description: `${getPaymentMethodName()} handle not set up for this worker.`,
+        variant: "destructive",
       });
+      setIsProcessing(false);
+      return;
+    }
+
+    // Check if on mobile for better app opening experience
+    if (isMobileDevice()) {
+      // Use enhanced deep linking system
+      await openPaymentApp(
+        paymentMethod as 'venmo' | 'cashapp' | 'zelle',
+        handle,
+        amount,
+        `Tip for ${worker.name}`,
+        (status) => {
+          toast({
+            title: "Opening payment app...",
+            description: status,
+          });
+        }
+      );
+    } else {
+      // Desktop fallback - open web versions
+      let webUrl = '';
+      if (paymentMethod === 'venmo') {
+        webUrl = `https://venmo.com/${handle.replace('@', '')}`;
+      } else if (paymentMethod === 'cashapp') {
+        webUrl = `https://cash.app/$${handle.replace('$', '')}`;
+      } else if (paymentMethod === 'zelle') {
+        toast({
+          title: "Zelle Payment",
+          description: `Please send $${amount} to ${handle} using your bank's mobile app or website.`,
+        });
+      }
+      
+      if (webUrl) {
+        window.open(webUrl, '_blank');
+      }
     }
 
     // Record the tip in our system
@@ -134,10 +160,24 @@ export default function PaymentModal({
             disabled={isProcessing || createTipMutation.isPending}
           >
             {isProcessing || createTipMutation.isPending 
-              ? "Processing..." 
-              : `Open ${getPaymentMethodName()}`
+              ? "Opening app..." 
+              : `Open ${getPaymentMethodName()} App`
             }
           </GradientButton>
+          
+          {paymentMethod === 'zelle' && (
+            <div className="text-center text-sm text-text-secondary bg-glass rounded-lg p-3">
+              <p>💡 If the app doesn't open automatically, manually open your banking app and send to: <span className="text-text-primary font-medium">{getHandle()}</span></p>
+            </div>
+          )}
+          
+          <div className="text-center">
+            <div className="text-xs text-text-secondary">
+              {paymentMethod === 'venmo' && "Will try to open Venmo app, then web as backup"}
+              {paymentMethod === 'cashapp' && "Will try to open Cash App, then web as backup"}  
+              {paymentMethod === 'zelle' && "Will try banking apps: Chase, Bank of America, Wells Fargo"}
+            </div>
+          </div>
           
           <button
             onClick={onClose}

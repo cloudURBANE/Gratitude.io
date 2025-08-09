@@ -40,11 +40,12 @@ Preferred communication style: Simple, everyday language.
 
 ## Payment Processing
 - **Primary Provider**: Stripe integration for secure card payments with real transaction processing
-- **Alternative Methods**: Deep links for Venmo, CashApp, and Zelle with handle management
+- **Alternative Methods**: Enhanced deep links for Venmo, CashApp, and Zelle with automatic app launching
 - **Payment Flow**: Modal-based payment selection with psychological pricing ($5, $8, $12, $20)
 - **Status Tracking**: Real-time payment intent tracking and comprehensive tip status management
 - **Optimization**: Analytics-driven recommendations to increase conversion rates and tip amounts
 - **Review Integration**: AI-powered Google/Yelp review prompts that appear after successful tips to boost worker ratings
+- **Mobile Integration**: Advanced deep linking that forces native app opening with fallback to web versions
 
 ## Mobile-First Design
 - **Responsive Design**: Mobile-first approach with 390×844 viewport optimization
