@@ -194,13 +194,9 @@ export default function Home() {
                     transition={{ delay: 0.6 }}
                     className="relative"
                   >
-                    <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                      Turn Every Service Into 
-                      <span className="text-green-400 animate-pulse"> MONEY</span>
+                    <h2 className="text-4xl md:text-6xl font-black text-white mb-4 leading-tight">
+                      One QR. Any wallet.<br />Two taps.
                     </h2>
-                    <div className="absolute -top-2 -right-4">
-                      <Sparkles className="w-8 h-8 text-yellow-400 animate-spin" />
-                    </div>
                   </motion.div>
                 </motion.div>
 
@@ -210,28 +206,27 @@ export default function Home() {
                   transition={{ delay: 0.8 }}
                   className="text-xl text-gray-300 mb-8 max-w-2xl lg:max-w-none leading-relaxed"
                 >
-                  The groundbreaking platform that's making service workers <span className="text-green-400 font-bold">300% more money</span>. 
-                  One QR code. Unlimited earnings. Zero hassle.
+                  A beautiful tip page for people who work for tips—designed to make saying "thanks" effortless.
                 </motion.p>
 
-                {/* Explosive Stats */}
+                {/* Key Benefits */}
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 1 }}
-                  className="grid grid-cols-3 gap-6 mb-10"
+                  className="flex flex-wrap gap-6 mb-10 text-lg text-gray-300"
                 >
-                  <div className="text-center">
-                    <div className="text-3xl font-black text-green-400 mb-1">$2.8M+</div>
-                    <div className="text-sm text-gray-400 font-medium">Tips Processed</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span>No app to download</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-black text-green-400 mb-1">67K+</div>
-                    <div className="text-sm text-gray-400 font-medium">Workers Earning</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span>Venmo • Cash App • Zelle • Card</span>
                   </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-black text-green-400 mb-1">300%</div>
-                    <div className="text-sm text-gray-400 font-medium">Income Boost</div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span>Mobile-first, fast, and private</span>
                   </div>
                 </motion.div>
 
@@ -245,7 +240,7 @@ export default function Home() {
                   <Link href="/login" className="group">
                     <button className="flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-black text-xl hover:shadow-2xl hover:shadow-green-500/30 transition-all transform hover:scale-105 group-hover:from-green-400 group-hover:to-emerald-500">
                       <DollarSign className="w-6 h-6" />
-                      START EARNING NOW
+                      START FREE
                       <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform" />
                     </button>
                   </Link>
@@ -286,10 +281,10 @@ export default function Home() {
               className="text-center mb-16"
             >
               <h2 className="text-4xl font-black text-white mb-6">
-                Why Everyone's Going <span className="text-green-400">VIRAL</span> With TipVault
+                Built for People Who Work for Tips
               </h2>
               <p className="text-xl text-gray-300 max-w-3xl mx-auto">
-                Join the money revolution that's transforming how service workers earn
+                Simple to share, quick to complete, and crafted to feel premium on any phone
               </p>
             </motion.div>
 
@@ -373,19 +368,28 @@ export default function Home() {
               className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-3xl p-12"
             >
               <h2 className="text-5xl font-black text-white mb-6">
-                Ready to <span className="text-green-400">3X Your Income</span>?
+                Ready to Start Earning More?
               </h2>
               <p className="text-xl text-gray-300 mb-8">
-                Join 67,000+ workers already earning more with TipVault
+                Join thousands of workers using TipVault
               </p>
               <Link href="/login">
                 <button className="px-12 py-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl font-black text-2xl hover:shadow-2xl hover:shadow-green-500/40 transition-all transform hover:scale-105">
-                  START YOUR MONEY VAULT
+                  START FREE
                 </button>
               </Link>
             </motion.div>
           </div>
         </section>
+
+        {/* Legal Footer */}
+        <footer className="px-4 py-8 border-t border-gray-800">
+          <div className="max-w-6xl mx-auto text-center">
+            <p className="text-sm text-gray-500">
+              TipVault deep-links to third-party payment apps. Names and logos belong to their owners; TipVault isn't affiliated with them.
+            </p>
+          </div>
+        </footer>
       </div>
     </div>
   );
