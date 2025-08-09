@@ -10,6 +10,7 @@ import TipPreset from "@/components/tip-preset";
 import PaymentMethod from "@/components/payment-method";
 import ProfileEditor from "@/components/profile-editor";
 import PaymentModal from "@/components/payment-modal";
+import ReviewPrompt from "@/components/review-prompt";
 
 interface Worker {
   id: string;
@@ -43,6 +44,7 @@ export default function TipPage() {
   const [tipNote, setTipNote] = useState("");
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showReviewPrompt, setShowReviewPrompt] = useState(false);
 
   // Demo data for when handle is 'demo'
   const demoWorker: Worker = {
@@ -99,6 +101,18 @@ export default function TipPage() {
         title: "Tip sent successfully!",
         description: "Your tip has been processed.",
       });
+
+      // Reset form
+      setSelectedAmount(null);
+      setCustomAmount("");
+      setSelectedPaymentMethod(null);
+      setTipNote("");
+      setShowPaymentModal(false);
+
+      // Show review prompt after successful tip (30% chance to avoid being intrusive)  
+      if (Math.random() < 0.3 && (worker?.googleReviewUrl || worker?.yelpReviewUrl)) {
+        setTimeout(() => setShowReviewPrompt(true), 1500);
+      }
     },
     onError: (error) => {
       toast({
@@ -434,6 +448,19 @@ export default function TipPage() {
           onSuccess={() => {
             setShowPaymentModal(false);
             setLocation('/success');
+          }}
+        />
+      )}
+
+      {showReviewPrompt && worker && (
+        <ReviewPrompt
+          worker={worker}
+          onClose={() => setShowReviewPrompt(false)}
+          onReviewSubmitted={() => {
+            toast({
+              title: "Thank you!",
+              description: "Your review helps support great service workers.",
+            });
           }}
         />
       )}

@@ -44,6 +44,7 @@ Preferred communication style: Simple, everyday language.
 - **Payment Flow**: Modal-based payment selection with psychological pricing ($5, $8, $12, $20)
 - **Status Tracking**: Real-time payment intent tracking and comprehensive tip status management
 - **Optimization**: Analytics-driven recommendations to increase conversion rates and tip amounts
+- **Review Integration**: AI-powered Google/Yelp review prompts that appear after successful tips to boost worker ratings
 
 ## Mobile-First Design
 - **Responsive Design**: Mobile-first approach with 390×844 viewport optimization
@@ -58,6 +59,8 @@ Preferred communication style: Simple, everyday language.
 - **Icon Strategy**: Inline SVG icons with lucide-react for consistent iconography
 - **Advanced Features**: Analytics dashboard with Recharts, QR code generation, profile management
 - **Navigation**: Full dashboard navigation between tip pages, analytics, QR tools, and settings
+- **AI Review System**: Smart review prompts with star ratings, platform selection (Google/Yelp), and conversion tracking
+- **Review Analytics**: Performance tracking showing review stats, conversion rates, and earning impact analysis
 
 # External Dependencies
 

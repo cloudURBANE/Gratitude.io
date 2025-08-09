@@ -118,6 +118,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Review interaction tracking
+  app.post("/api/review-interactions", async (req, res) => {
+    try {
+      const { workerId, platform, rating, hasText } = req.body;
+      
+      // In a real app, this would save to database
+      // For demo, we'll just return success
+      res.json({ 
+        success: true,
+        message: "Review interaction tracked successfully" 
+      });
+    } catch (error: any) {
+      console.error("Error tracking review interaction:", error);
+      res.status(500).json({ message: "Error tracking review interaction: " + error.message });
+    }
+  });
+
+  // Review stats endpoint
+  app.get("/api/workers/:id/review-stats", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      // Demo stats - in production this would query the database
+      const stats = {
+        totalReviews: 47,
+        averageRating: 4.8,
+        googleReviews: 32,
+        yelpReviews: 15,
+        recentReviews: [
+          { platform: 'google', rating: 5, date: '2025-01-07', hasText: true },
+          { platform: 'yelp', rating: 5, date: '2025-01-06', hasText: true },
+          { platform: 'google', rating: 4, date: '2025-01-05', hasText: false },
+          { platform: 'google', rating: 5, date: '2025-01-04', hasText: true },
+        ],
+        conversionRate: 23.5,
+      };
+
+      res.json(stats);
+    } catch (error: any) {
+      console.error("Error fetching review stats:", error);
+      res.status(500).json({ message: "Error fetching review stats: " + error.message });
+    }
+  });
+
   // QR Code generation
   app.get("/api/workers/:handle/qr", async (req, res) => {
     try {

@@ -4,6 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 
 import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
+import ReviewStats from "@/components/review-stats";
 
 interface Worker {
   id: string;
@@ -204,6 +205,9 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Review Stats */}
+          <ReviewStats workerId={displayWorker.id} />
+
           {/* Earnings Optimization Insights */}
           <GlassCard className="p-6">
             <h2 className="text-xl font-semibold text-text-primary mb-6">💡 Earning Optimization Tips</h2>
