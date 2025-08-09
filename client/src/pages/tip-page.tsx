@@ -15,9 +15,9 @@ import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
 import TipPreset from "@/components/tip-preset";
 import { PaymentMethodWithIcon } from "@/components/payment-app-icons";
-import FlawlessThumbDial from "@/components/flawless-thumb-dial";
+import ProfessionalThumbDial from "@/components/professional-thumb-dial";
 import OneTapRepeat from "@/components/one-tap-repeat";
-import WhisperBoost from "@/components/whisper-boost";
+import SimpleWhisperBoost from "@/components/simple-whisper-boost";
 import ReturnFlowReviews from "@/components/return-flow-reviews";
 import EnhancedGlassCard from "@/components/enhanced-glass-card";
 import EnhancedPaymentButton from "@/components/enhanced-payment-button";
@@ -215,7 +215,7 @@ export default function TipPage() {
     const amount = getCurrentAmount()!;
 
     // Save this tip to memory for future One-Tap Repeat
-    if (handle) {
+    if (handle && selectedPaymentMethod) {
       tipMemoryManager.saveLastTip(handle, amount, selectedPaymentMethod);
     }
 
@@ -349,7 +349,7 @@ export default function TipPage() {
             <h3 className="text-lg font-medium text-text-primary mb-6 text-center">
               Say thanks in 2 taps
             </h3>
-            <FlawlessThumbDial
+            <ProfessionalThumbDial
               onAmountChange={(amount) => {
                 setSelectedAmount(amount);
                 setCustomAmount("");
@@ -400,7 +400,7 @@ export default function TipPage() {
         </div>
 
         {/* Whisper Boost - optional $1 add-on */}
-        <WhisperBoost
+        <SimpleWhisperBoost
           config={whisperBoostConfig}
           currentAmount={selectedAmount || (customAmount ? parseFloat(customAmount) : 0) || 0}
           onBoostChange={setWhisperBoostEnabled}

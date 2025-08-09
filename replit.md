@@ -5,6 +5,7 @@ TipLink is a comprehensive, production-ready digital tipping platform designed t
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
+UI/UX Priority: Professional, performance-focused design over flashy animations. Realistic interactions that feel native and responsive.
 
 # System Architecture
 
