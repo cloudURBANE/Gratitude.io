@@ -61,8 +61,10 @@ UI/UX Priority: Professional, performance-focused design over flashy animations.
 - **Icon Strategy**: Inline SVG icons with lucide-react for consistent iconography
 - **Advanced Features**: Analytics dashboard with Recharts, QR code generation, profile management
 - **Navigation**: Full dashboard navigation between tip pages, analytics, QR tools, and settings
-- **AI Review System**: Smart review prompts with star ratings, platform selection (Google/Yelp), and conversion tracking
-- **Review Analytics**: Performance tracking showing review stats, conversion rates, and earning impact analysis
+- **Hold-to-Tip Interface**: Revolutionary press-and-slide gesture for amount selection with liquid gradient ring, haptic feedback, and accessibility support
+- **Smart Dock Payment**: Adaptive payment method selection based on device platform with in-app browser detection and deep link optimization
+- **Micro-Impact Bar**: Real-time impact visualization showing rent percentage, work time equivalent, and meaningful context
+- **Return-to-Review System**: Intelligent review prompts that appear after payment handoff with Google/Yelp integration and wallet pass generation
 
 # External Dependencies
 
