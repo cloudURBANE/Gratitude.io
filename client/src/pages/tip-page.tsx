@@ -8,6 +8,9 @@ import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
 import TipPreset from "@/components/tip-preset";
 import { PaymentMethodWithIcon } from "@/components/payment-app-icons";
+import ThumbDial from "@/components/thumb-dial";
+import EnhancedGlassCard from "@/components/enhanced-glass-card";
+import EnhancedPaymentButton from "@/components/enhanced-payment-button";
 import ProfileEditor from "@/components/profile-editor";
 import PaymentModal from "@/components/payment-modal";
 import ZelleModal from "@/components/zelle-modal";
@@ -261,42 +264,19 @@ export default function TipPage() {
           </GlassCard>
         </div>
 
-        {/* Tip amount presets */}
-        <div className="mb-6">
-          <h3 className="text-lg font-medium text-text-primary mb-4">Choose amount</h3>
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            {[
-              { amount: 5, label: "Quick tip" },
-              { amount: 8, label: "Good service" },
-              { amount: 12, label: "Great service" },
-              { amount: 20, label: "Excellent!" }
-            ].map(({ amount, label }) => (
-              <TipPreset
-                key={amount}
-                amount={amount}
-                label={label}
-                isSelected={selectedAmount === amount}
-                onSelect={() => handleTipAmountSelect(amount)}
-              />
-            ))}
-          </div>
-          
-          {/* Custom amount input */}
-          <GlassCard className="rounded-xl p-4">
-            <label className="block text-sm font-medium text-text-secondary mb-2">Custom amount</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-primary text-lg">$</span>
-              <input 
-                type="number" 
-                className="w-full bg-transparent border border-glass-border rounded-lg py-3 pl-8 pr-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
-                placeholder="0.00" 
-                min="1" 
-                step="0.01"
-                value={customAmount}
-                onChange={(e) => handleCustomAmountChange(e.target.value)}
-              />
-            </div>
-          </GlassCard>
+        {/* Genius Thumb Dial */}
+        <div className="mb-8">
+          <h3 className="text-lg font-medium text-text-primary mb-6 text-center">
+            Say thanks in 2 taps
+          </h3>
+          <ThumbDial
+            onAmountChange={(amount) => {
+              setSelectedAmount(amount);
+              setCustomAmount("");
+            }}
+            selectedAmount={selectedAmount}
+            customAmount={customAmount}
+          />
         </div>
 
         {/* Payment methods */}
@@ -358,24 +338,29 @@ export default function TipPage() {
           </GlassCard>
         </div>
 
-        {/* Primary action button */}
-        <GradientButton
-          className="w-full py-4 text-lg mb-6"
-          disabled={!canSendTip()}
-          onClick={handleSendTip}
-        >
-          {canSendTip() 
-            ? `Send $${getCurrentAmount()} tip` 
-            : 'Select amount & method to continue'
-          }
-        </GradientButton>
+        {/* Enhanced primary action button */}
+        <div className="mb-6">
+          <EnhancedPaymentButton
+            onClick={handleSendTip}
+            disabled={!canSendTip()}
+            paymentMethod={selectedPaymentMethod as 'venmo' | 'cashapp' | 'zelle' | 'stripe'}
+            amount={getCurrentAmount() || 0}
+            className="text-lg font-semibold"
+          >
+            {canSendTip() 
+              ? `Send $${getCurrentAmount()} tip` 
+              : 'Select amount & method to continue'
+            }
+          </EnhancedPaymentButton>
+        </div>
 
-        {/* Reviews section */}
-        <GlassCard className="rounded-xl p-4 mb-6">
-          <h3 className="font-medium text-text-primary mb-3">Leave a review</h3>
+        {/* Enhanced reviews section with glass chips */}
+        <EnhancedGlassCard className="rounded-xl p-4 mb-6" depth="interactive">
+          <h3 className="font-medium text-text-primary mb-3">Leave a quick 5⭐ note?</h3>
           <div className="flex gap-3">
-            <button 
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-glass hover:bg-glass-border rounded-lg transition-all duration-200 focus-visible" 
+            <EnhancedGlassCard 
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 cursor-pointer text-sm font-medium"
+              depth="interactive"
               onClick={() => handleOpenReview('google')}
             >
               <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
@@ -385,9 +370,10 @@ export default function TipPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
               </svg>
               <span className="text-text-primary">Google</span>
-            </button>
-            <button 
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-glass hover:bg-glass-border rounded-lg transition-all duration-200 focus-visible" 
+            </EnhancedGlassCard>
+            <EnhancedGlassCard 
+              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 cursor-pointer text-sm font-medium"
+              depth="interactive" 
               onClick={() => handleOpenReview('yelp')}
             >
               <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 24 24">
@@ -398,9 +384,9 @@ export default function TipPage() {
                 <path d="M12 2.475L8.683 3.85a.8.8 0 0 0-.287.849l.228 1.39a.8.8 0 0 0 1.24.672L12 4.366a.8.8 0 0 0 0-1.891z"/>
               </svg>
               <span className="text-text-primary">Yelp</span>
-            </button>
+            </EnhancedGlassCard>
           </div>
-        </GlassCard>
+        </EnhancedGlassCard>
 
         {/* Share section */}
         <GlassCard className="rounded-xl p-4 text-center">
