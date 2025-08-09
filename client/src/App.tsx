@@ -28,7 +28,7 @@ function Router() {
       <Route path="/business" component={BusinessDashboard} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/u/:handle" component={TipFlow} />
-      <Route path="/u/:handle/checkout" component={Checkout} />
+      <Route path="/checkout" component={Checkout} />
       <Route path="/u/:handle/analytics" component={Analytics} />
       <Route path="/u/:handle/qr" component={QRGenerator} />
       <Route path="/u/:handle/settings" component={ProfileSettings} />

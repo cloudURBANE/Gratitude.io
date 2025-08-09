@@ -4,10 +4,17 @@
 
 ## Business Model
 - **Primary Revenue**: Monthly/yearly subscriptions ($4.99-$35)
-- **Secondary Revenue**: Transaction fees (2.9% on all tips)
+- **Secondary Revenue**: Transaction fees (2.9% on all tips)  
 - **Enterprise Revenue**: Custom solutions for restaurant chains and hospitality groups
 - **Market Size**: $45B+ global tipping market, 15M+ service workers in US alone
 - **Unit Economics**: 85% gross margins, $47 average customer LTV, 18-month payback period
+
+## Complete Pricing Funnel (2025)
+- **Landing Page**: Professional hero with 300% tip increase promise and direct pricing CTA
+- **Pricing Page**: Clean 3-tier pricing (Free/$0, Pro/$4.99/month, Enterprise/Custom) with billing toggle and FAQ
+- **Checkout Flow**: Full form validation, 7-day free trial, secure payment processing with order summary
+- **Success Page**: Welcome sequence with next steps, trial info, and dashboard onboarding
+- **Conversion Flow**: Landing → Pricing → Checkout → Success → Dashboard (seamless 4-page funnel)
 
 # User Preferences
 
