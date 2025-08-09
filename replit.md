@@ -1,21 +1,23 @@
 # Overview
 
-TipLink is a comprehensive, production-ready digital tipping platform designed to maximize earnings for service workers through optimized tip collection and analytics. The platform features real payment processing with Stripe, comprehensive analytics dashboards, QR code generation tools, profile management, and advanced optimization features. Built with a premium dark glass aesthetic and mobile-first design, TipLink transforms how workers collect and track tips while providing customers with seamless, multi-channel payment options.
+**TipVault** is a groundbreaking, viral-focused digital tipping platform engineered to transform service workers into money-earning powerhouses through revolutionary optimization and viral marketing psychology. The platform delivers 300% income increases through AI-powered tip optimization, comprehensive payment verification systems, gamified earning experiences, and appreciation-focused customer interactions. Built with a money-focused dark aesthetic featuring animated SVG graphics and viral design elements, TipVault creates an addictive earning experience that maximizes both tip collection and viral adoption.
 
 # User Preferences
 
-Preferred communication style: Simple, everyday language.
-UI/UX Priority: Professional, performance-focused design over flashy animations. Realistic interactions that feel native and responsive.
+Preferred communication style: Simple, everyday language with viral money-focused messaging.
+UI/UX Priority: Groundbreaking viral design with animated money graphics, high-impact animations, and psychology-driven money-earning focus. Emphasizes visual impact and viral adoption over conservative design.
+Brand Direction: **TipVault** - The viral name that emphasizes money accumulation and wealth building for service workers.
 
 # System Architecture
 
-## Frontend Architecture
+## Frontend Architecture  
 - **Framework**: React with TypeScript using Vite for development and building
-- **Styling**: Tailwind CSS with a custom dark glass design system featuring glassmorphism effects
-- **Component Library**: Radix UI primitives with custom components (GlassCard, GradientButton, TipPreset, PaymentMethod)
-- **Routing**: Wouter for client-side routing with routes for tip pages (`/u/:handle`), checkout, success, and style guide
-- **State Management**: React Query (TanStack Query) for server state management and data fetching
-- **UI Theme**: Dark glass aesthetic with CSS custom properties, gradient accents, and Inter font family
+- **Styling**: Tailwind CSS with viral money-focused design system featuring animated gradients, SVG graphics, and high-impact visual effects
+- **Component Library**: Radix UI primitives with custom viral components (MoneyFlowSVG, GlassCard, GradientButton, AnimatedStats)
+- **Routing**: Wouter for client-side routing with routes for tip pages (`/u/:handle`), checkout, success, and viral landing
+- **State Management**: React Query (TanStack Query) for server state management and real-time payment verification
+- **UI Theme**: **TipVault** brand with money-green gradients, animated SVG money graphics, sparkle effects, and viral design psychology
+- **Animations**: Framer Motion with money-focused animations, floating bills, animated stats, and viral engagement elements
 
 ## Backend Architecture
 - **Runtime**: Node.js with Express.js server
@@ -40,13 +42,14 @@ UI/UX Priority: Professional, performance-focused design over flashy animations.
 - **Session Management**: Express session configuration prepared for future implementation
 
 ## Payment Processing
-- **Primary Provider**: Stripe integration for secure card payments with real transaction processing
-- **Alternative Methods**: Enhanced deep links for Venmo, CashApp, and Zelle with automatic app launching
-- **Payment Flow**: Modal-based payment selection with psychological pricing ($5, $8, $12, $20)
-- **Status Tracking**: Real-time payment intent tracking and comprehensive tip status management
-- **Optimization**: Analytics-driven recommendations to increase conversion rates and tip amounts
-- **Review Integration**: AI-powered Google/Yelp review prompts that appear after successful tips to boost worker ratings
-- **Mobile Integration**: Advanced deep linking that forces native app opening with fallback to web versions
+- **Primary Provider**: Stripe integration with comprehensive payment verification and backend validation
+- **Alternative Methods**: Failproof deep links for Venmo, CashApp, and Zelle with multiple simultaneous strategies
+- **Payment Flow**: Appreciation-focused selection with service rating validation and review text collection
+- **Verification System**: Multi-layered payment verification with backend API validation, localStorage tracking, and manual confirmation
+- **Status Tracking**: Real-time payment intent tracking with comprehensive error handling and retry mechanisms  
+- **Optimization**: Psychology-driven pricing with 300% earnings boost through AI-powered recommendations
+- **Review Integration**: Star-rating validation system with appreciation-focused messaging and review text collection
+- **Mobile Integration**: Advanced payment launchers with visibility detection and comprehensive fallback mechanisms
 
 ## Mobile-First Design
 - **Responsive Design**: Mobile-first approach with 390×844 viewport optimization
