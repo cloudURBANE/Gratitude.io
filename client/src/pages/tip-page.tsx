@@ -10,6 +10,7 @@ import TipPreset from "@/components/tip-preset";
 import { PaymentMethodWithIcon } from "@/components/payment-app-icons";
 import ProfileEditor from "@/components/profile-editor";
 import PaymentModal from "@/components/payment-modal";
+import ZelleModal from "@/components/zelle-modal";
 import ReviewPrompt from "@/components/review-prompt";
 
 interface Worker {
@@ -45,6 +46,7 @@ export default function TipPage() {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
+  const [showZelleModal, setShowZelleModal] = useState(false);
 
   // Demo data for when handle is 'demo'
   const demoWorker: Worker = {
@@ -56,7 +58,7 @@ export default function TipPage() {
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150',
     venmoHandle: 'jordan-coffee',
     cashappHandle: 'jordanbarista',
-    zelleInfo: 'jordan@coffee.com',
+    zelleHandle: 'jordan@coffee.com',
     stripeAccountId: 'demo-stripe',
     googleReviewUrl: 'https://g.page/demo',
     yelpReviewUrl: 'https://yelp.com/demo',
@@ -156,8 +158,11 @@ export default function TipPage() {
     if (selectedPaymentMethod === 'stripe') {
       // For Stripe, redirect to checkout
       setLocation(`/u/${handle}/checkout?amount=${amount}&note=${encodeURIComponent(tipNote)}`);
+    } else if (selectedPaymentMethod === 'zelle') {
+      // For Zelle, show dedicated modal
+      setShowZelleModal(true);
     } else {
-      // For other payment methods, show payment modal
+      // For Venmo and Cash App, show payment modal
       setShowPaymentModal(true);
     }
   };
@@ -452,6 +457,24 @@ export default function TipPage() {
               title: "Thank you!",
               description: "Your review helps support great service workers.",
             });
+          }}
+        />
+      )}
+
+      {showZelleModal && worker && (
+        <ZelleModal
+          worker={worker}
+          amount={getCurrentAmount()!}
+          onClose={() => setShowZelleModal(false)}
+          onSuccess={() => {
+            setShowZelleModal(false);
+            createTipMutation.mutate({
+              workerId: worker.id,
+              amount: getCurrentAmount()!.toString(),
+              paymentMethod: 'zelle',
+              note: tipNote || `Tip for ${worker.name}`,
+            });
+            setLocation('/success');
           }}
         />
       )}

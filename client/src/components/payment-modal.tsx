@@ -71,39 +71,19 @@ export default function PaymentModal({
       return;
     }
 
-    // Check if on mobile for better app opening experience
-    if (isMobileDevice()) {
-      // Use enhanced deep linking system
-      await openPaymentApp(
-        paymentMethod as 'venmo' | 'cashapp' | 'zelle',
-        handle,
-        amount,
-        `Tip for ${worker.name}`,
-        (status) => {
-          toast({
-            title: "Opening payment app...",
-            description: status,
-          });
-        }
-      );
-    } else {
-      // Desktop fallback - open web versions
-      let webUrl = '';
-      if (paymentMethod === 'venmo') {
-        webUrl = `https://venmo.com/${handle.replace('@', '')}`;
-      } else if (paymentMethod === 'cashapp') {
-        webUrl = `https://cash.app/$${handle.replace('$', '')}`;
-      } else if (paymentMethod === 'zelle') {
+    // Use enhanced deep linking system for all devices
+    await openPaymentApp(
+      paymentMethod as 'venmo' | 'cashapp' | 'zelle',
+      handle,
+      amount,
+      `Tip for ${worker.name}`,
+      (status) => {
         toast({
-          title: "Zelle Payment",
-          description: `Please send $${amount} to ${handle} using your bank's mobile app or website.`,
+          title: "Opening payment app...",
+          description: status,
         });
       }
-      
-      if (webUrl) {
-        window.open(webUrl, '_blank');
-      }
-    }
+    );
 
     // Record the tip in our system
     createTipMutation.mutate({
@@ -178,9 +158,9 @@ export default function PaymentModal({
           
           <div className="text-center">
             <div className="text-xs text-text-secondary">
-              {paymentMethod === 'venmo' && "Will try to open Venmo app, then web as backup"}
-              {paymentMethod === 'cashapp' && "Will try to open Cash App, then web as backup"}  
-              {paymentMethod === 'zelle' && "Will try banking apps: Chase, Bank of America, Wells Fargo"}
+              {paymentMethod === 'venmo' && "Opens Venmo app with amount and note pre-filled"}
+              {paymentMethod === 'cashapp' && "Opens Cash App with amount pre-filled"}  
+              {paymentMethod === 'zelle' && "Manual entry required in your banking app"}
             </div>
           </div>
           

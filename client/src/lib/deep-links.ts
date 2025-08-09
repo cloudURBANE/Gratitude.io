@@ -8,31 +8,22 @@ interface PaymentAppLinks {
 
 export const paymentAppLinks: PaymentAppLinks = {
   venmo: (handle: string, amount: number, note: string) => ({
-    deepLink: `venmo://paycharge?txn=pay&recipients=${handle.replace('@', '')}&amount=${amount}&note=${encodeURIComponent(note)}`,
-    webFallback: `https://venmo.com/${handle.replace('@', '')}`
+    deepLink: `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(handle.replace('@', ''))}&amount=${amount}&note=${encodeURIComponent(note)}`,
+    webFallback: `https://venmo.com/${encodeURIComponent(handle.replace('@', ''))}?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`
   }),
   
   cashapp: (handle: string, amount: number) => ({
-    deepLink: `cashapp://pay/${handle.replace('$', '')}/${amount}`,
-    webFallback: `https://cash.app/$${handle.replace('$', '')}/${amount}`
+    deepLink: `https://cash.app/$${encodeURIComponent(handle.replace('$', ''))}/${amount}`,
+    webFallback: `https://cash.app/$${encodeURIComponent(handle.replace('$', ''))}/${amount}`
   }),
   
   zelle: (handle: string, amount: number, note: string) => ({
-    deepLinks: [
-      `zelle://send?recipient=${handle}&amount=${amount}&note=${encodeURIComponent(note)}`,
-      `com.zellepay.zelle://send?to=${handle}&amount=${amount}`,
-      `bankofamerica://zelle/send?recipient=${handle}&amount=${amount}`,
-      `wellsfargo://zelle/send?recipient=${handle}&amount=${amount}`,
-      `chase://zelle/send?recipient=${handle}&amount=${amount}`,
-      `usbank://zelle/send?recipient=${handle}&amount=${amount}`,
-      `pncbank://zelle/send?recipient=${handle}&amount=${amount}`,
-      `capitalone://zelle/send?recipient=${handle}&amount=${amount}`
-    ],
-    fallback: `Manual Zelle transfer to ${handle} for $${amount}`
+    deepLinks: [], // Zelle has no reliable deep links
+    fallback: `Send $${amount} to ${handle} using Zelle in your banking app`
   })
 };
 
-// Function to attempt app opening with multiple fallback strategies
+// Reliable payment app opening based on best practices
 export const openPaymentApp = async (
   paymentMethod: 'venmo' | 'cashapp' | 'zelle',
   handle: string,
@@ -44,47 +35,31 @@ export const openPaymentApp = async (
   if (paymentMethod === 'venmo') {
     const links = paymentAppLinks.venmo(handle, amount, note);
     
-    onStatusUpdate("Opening Venmo app...");
-    await attemptDeepLink(links.deepLink);
+    onStatusUpdate("Opening Venmo...");
     
-    // Fallback to web after delay
-    setTimeout(() => {
-      onStatusUpdate("Opening Venmo web version...");
-      window.open(links.webFallback, '_blank');
-    }, 2000);
+    // Try app scheme first, then fallback to universal link
+    const timeout = setTimeout(() => {
+      window.location.href = links.webFallback;
+    }, 700);
+    
+    try {
+      window.location.href = links.deepLink;
+      // If app opens successfully, page gets backgrounded and timeout won't fire
+    } catch (error) {
+      clearTimeout(timeout);
+      window.location.href = links.webFallback;
+    }
     
   } else if (paymentMethod === 'cashapp') {
     const links = paymentAppLinks.cashapp(handle, amount);
     
     onStatusUpdate("Opening Cash App...");
-    await attemptDeepLink(links.deepLink);
-    
-    // Fallback to web after delay
-    setTimeout(() => {
-      onStatusUpdate("Opening Cash App web version...");
-      window.open(links.webFallback, '_blank');
-    }, 2000);
+    // Cash App universal link works reliably on both mobile and desktop
+    window.location.href = links.deepLink;
     
   } else if (paymentMethod === 'zelle') {
     const links = paymentAppLinks.zelle(handle, amount, note);
-    
-    onStatusUpdate("Trying to open banking apps...");
-    
-    // Try each banking app deep link with delays
-    for (let i = 0; i < links.deepLinks.length; i++) {
-      setTimeout(async () => {
-        try {
-          await attemptDeepLink(links.deepLinks[i]);
-        } catch (error) {
-          console.log(`Failed to open banking app ${i + 1}:`, error);
-        }
-      }, i * 800); // Stagger attempts
-    }
-    
-    // Final fallback message
-    setTimeout(() => {
-      onStatusUpdate(links.fallback);
-    }, links.deepLinks.length * 800 + 1000);
+    onStatusUpdate(links.fallback);
   }
 };
 

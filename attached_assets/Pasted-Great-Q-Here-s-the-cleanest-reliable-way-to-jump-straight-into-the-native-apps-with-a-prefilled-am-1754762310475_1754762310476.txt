@@ -1,0 +1,84 @@
+Great Q. Here’s the cleanest, reliable way to jump straight into the native apps with a prefilled amount (and a note where supported), plus fallbacks.
+
+TL;DR
+	•	Cash App: universal link → https://cash.app/$<cashtag>/<amount> (opens app on mobile; amount is prefilled). Note text can’t be prefilled.  ￼ ￼
+	•	Venmo: universal link → https://venmo.com/<username>?txn=pay&amount=<amount>&note=<urlencoded> (usually opens the app and pre-fills; use web link as the primary, and optionally try the app-scheme first). Heads-up: Venmo has changed behavior at times—test on iOS/Android.  ￼ ￼
+	•	Zelle: no public deep link for amount. Best practice is to show the user’s Zelle QR (from their bank/Zelle app); the sender scans, then enters amount in their bank app.  ￼
+
+⸻
+
+Exact link formats
+
+Cash App (best reliability)
+
+https://cash.app/$RACK/20        // $20 to $RACK
+// note is not supported in the URL
+
+On mobile this opens the Cash App with the amount filled; on desktop it shows the web version.  ￼
+
+Venmo
+
+https://venmo.com/USERNAME?txn=pay&amount=20&note=Thanks%20for%20the%20service
+
+This is a universal web link that hands off to the Venmo app on mobile and pre-fills amount + note. If Venmo changes behavior (it has before), keep a fallback (below).  ￼
+
+Zelle
+	•	Show the person’s Zelle QR (users get it inside their bank/Zelle app). Scanning opens the correct bank/Zelle flow; the amount can’t be reliably prefilled across banks.  ￼
+
+⸻
+
+“Try app → fallback to web” (Venmo only)
+
+Some in-app browsers (IG/FB) block app handoff. Use the native scheme first, then fall back to the universal link:
+
+// given { username, amount, note }
+const venmoScheme = `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(username)}&amount=${amount}&note=${encodeURIComponent(note)}`;
+const venmoUniversal = `https://venmo.com/${encodeURIComponent(username)}?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`;
+
+function openVenmo() {
+  const timeout = setTimeout(() => { window.location.href = venmoUniversal; }, 700);
+  // try the app scheme first; if it fails, timer sends them to the universal link
+  window.location.href = venmoScheme;
+  // if the scheme succeeds, the page gets backgrounded and the timeout never fires
+  // if it fails, after ~700ms they'll hit the universal link which should hand off to app
+}
+
+Note: Venmo’s internals aren’t officially documented and behavior has shifted; the universal https link tends to be the most stable path long-term. Test on real iOS/Android.  ￼ ￼
+
+⸻
+
+Cash App helper
+
+function cashAppLink(cashtag: string, amount: number) {
+  // amount can be integer or decimal like 12.50
+  return `https://cash.app/$${encodeURIComponent(cashtag)}/${amount}`;
+}
+
+(Notes cannot be prefilled.)  ￼
+
+⸻
+
+Zelle UX (what to build)
+	•	Profile editor: upload/display the user’s Zelle QR (PNG/SVG).
+	•	On the tip page: show a “Pay with Zelle” button → opens a modal with the QR and the recipient email/phone as copyable text.
+	•	Add a helper text: “Scan in your banking app’s Zelle to pay. Enter amount: $20” (you can still pass the suggested amount in UI, not to the app).  ￼
+
+⸻
+
+In-app browser gotchas (and fixes)
+	•	IG/FB/Twitter in-app browsers often don’t invoke app links reliably. Show a “Open in Safari/Chrome” tip or a QR code for the link so the camera opens the right app context. (Android 12+ also tightened generic intent handling.)  ￼
+
+⸻
+
+Drop-in to your scaffold
+
+In your Next.js UI:
+	•	Build a getPayLink({method, handle, amount, note}) util that returns:
+	•	cashApp → https://cash.app/$<handle>/<amount>
+	•	venmo → prefer universal link; optionally attempt scheme first as above
+	•	zelle → (no link) return {qrUrl, recipientText} for the modal
+	•	For QR buttons, generate a QR of the final URL (Cash App or Venmo). For Zelle, show the user-supplied QR.
+
+If you want, I’ll wire these into your /u/[handle] page and add a tiny modal that:
+	•	Venmo/Cash App: shows buttons for $3 / $5 / $10 / $20 / Custom, then opens the deep link.
+	•	Zelle: shows the QR + copy buttons for phone/email, with your suggested amount displayed.
