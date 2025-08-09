@@ -13,8 +13,8 @@ interface SnakeGameProps {
 }
 
 // Game config
-const COLS = 16;
-const ROWS = 20;
+const COLS = 14;
+const ROWS = 16;
 const TICK_MS_BASE = 160;
 const DOLLARS_PER_FOOD = 1;
 
@@ -38,7 +38,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
 
   // Responsive canvas sizing
   const [tile, dims] = useMemo(() => {
-    const maxWidth = 320;
+    const maxWidth = 280;
     const size = Math.floor(maxWidth / COLS);
     return [size, { cssW: size * COLS, cssH: size * ROWS }];
   }, []);
@@ -402,12 +402,17 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
   ].filter(m => m.available);
 
   return (
-    <div className={`bg-glass backdrop-blur-md border border-glass-border rounded-2xl p-4 ${className}`}>
+    <motion.div 
+      className={`bg-glass backdrop-blur-md border border-glass-border rounded-2xl p-4 ${className}`}
+      initial={{ opacity: 0, scale: 0.9 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, ease: [0.4, 0.0, 0.2, 1] }}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-semibold text-text-primary">Snake Tip Game</h3>
-          <p className="text-sm text-text-secondary">Each $ = $1 tip</p>
+          <h3 className="text-lg font-semibold text-text-primary">Play to Tip</h3>
+          <p className="text-sm text-text-secondary">Eat $ to earn tips</p>
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold text-accent-start">${tipAmount}</div>
@@ -416,14 +421,20 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
       </div>
 
       {/* Game Canvas */}
-      <div className="relative mb-4">
+      <motion.div 
+        className="relative mb-4"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
         <canvas
           ref={canvasRef}
-          className="border border-glass-border rounded-lg mx-auto block touch-none"
+          className="border border-glass-border rounded-lg mx-auto block touch-none shadow-lg"
           width={dims.cssW}
           height={dims.cssH}
           style={{ width: dims.cssW, height: dims.cssH, touchAction: 'none' }}
         />
+      </motion.div>
         
         {/* Game overlay */}
         <AnimatePresence>
@@ -443,10 +454,10 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
                 ) : (
                   <>
                     <div className="text-xl font-bold text-white mb-2">
-                      {score === 0 ? "Ready to Play?" : "Paused"}
+                      {score === 0 ? "Ready to Earn Tips?" : "Game Paused"}
                     </div>
                     <div className="text-sm text-white/80 mb-4">
-                      {score === 0 ? "Swipe or use arrow keys" : ""}
+                      {score === 0 ? "Swipe or use arrow keys to start" : ""}
                     </div>
                   </>
                 )}
@@ -463,7 +474,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
                       onClick={() => setPaused(false)}
                       className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
                     >
-                      {score === 0 ? "Start Game" : "Resume"}
+                      {score === 0 ? "Start Earning" : "Resume"}
                     </button>
                   )}
                 </div>
@@ -471,7 +482,6 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
 
       {/* Controls */}
       <div className="flex gap-2 mb-4">
@@ -493,7 +503,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
       {/* Payment methods */}
       {tipAmount > 0 && (
         <>
-          <div className="text-sm text-text-secondary mb-2">Pay with:</div>
+          <div className="text-sm text-text-secondary mb-2">Send with:</div>
           <div className="grid grid-cols-2 gap-2 mb-4">
             {paymentMethods.map(payMethod => (
               <button
@@ -517,14 +527,14 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
             disabled={tipAmount === 0}
             className="w-full py-3 bg-gradient-to-r from-accent-start to-accent-end rounded-lg text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            Send ${tipAmount} Tip
+            Send ${tipAmount}
           </button>
         </>
       )}
 
       {/* Instructions */}
       <div className="mt-4 text-xs text-text-secondary text-center">
-        Swipe or use arrow keys • Space to pause • R to reset
+        Swipe or arrow keys to move • Space to pause • R to restart
       </div>
 
       {/* Zelle modal */}
@@ -569,6 +579,6 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }

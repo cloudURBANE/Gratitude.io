@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -37,6 +37,7 @@ export default function TipFlow() {
   const [selectedAmount, setSelectedAmount] = useState<number>(0);
   const [selectedMethod, setSelectedMethod] = useState<PayMethod>("stripe");
   const [isGameMode, setIsGameMode] = useState(false);
+  const gameRef = useRef<HTMLDivElement>(null);
   const [processingComplete, setProcessingComplete] = useState(false);
 
   // Demo worker data
@@ -68,6 +69,19 @@ export default function TipFlow() {
       setTimeout(() => setCurrentStep("payment"), 800);
     }
   }, [selectedAmount, currentStep]);
+
+  // Smooth scroll to game when switching modes
+  useEffect(() => {
+    if (isGameMode && gameRef.current) {
+      setTimeout(() => {
+        gameRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+          inline: 'center'
+        });
+      }, 100);
+    }
+  }, [isGameMode]);
 
   // Handle payment method selection
   const handlePaymentSelect = (method: PayMethod) => {
@@ -208,7 +222,7 @@ export default function TipFlow() {
                           : 'text-text-secondary hover:text-text-primary'
                       }`}
                     >
-                      Snake Game
+                      Play & Tip
                     </button>
                   </div>
                 </div>
@@ -220,10 +234,12 @@ export default function TipFlow() {
                     selectedAmount={selectedAmount}
                   />
                 ) : (
-                  <SnakeGame
-                    worker={worker}
-                    onTipEarned={(amount) => setSelectedAmount(amount)}
-                  />
+                  <div ref={gameRef}>
+                    <SnakeGame
+                      worker={worker}
+                      onTipEarned={(amount) => setSelectedAmount(amount)}
+                    />
+                  </div>
                 )}
 
                 {/* Continue hint */}
@@ -265,7 +281,7 @@ export default function TipFlow() {
 
               {/* Payment methods */}
               <GlassCard className="p-6">
-                <h2 className="text-xl font-semibold mb-6 text-center">Choose payment method</h2>
+                <h2 className="text-xl font-semibold mb-6 text-center">Send tip with</h2>
                 
                 <SmartDock
                   amount={selectedAmount}

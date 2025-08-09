@@ -119,7 +119,7 @@ export default function QuickTip({ onAmountSelect, selectedAmount, className = "
           animate={{ opacity: 1, y: 0 }}
           className="text-center p-4 bg-glass backdrop-blur-md border border-glass-border rounded-xl"
         >
-          <div className="text-sm text-text-secondary mb-1">This tip covers</div>
+          <div className="text-sm text-text-secondary mb-1">This covers</div>
           <div className="font-medium text-text-primary">
             {selectedAmount >= 15 ? "🍕 A meal" : 
              selectedAmount >= 10 ? "☕ Coffee for the team" :
