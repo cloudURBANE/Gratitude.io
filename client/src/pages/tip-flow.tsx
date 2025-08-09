@@ -10,6 +10,7 @@ import PaymentDock from "@/components/payment-dock";
 import SnakeGame from "@/components/snake-game";
 import { buildPayUrl, defaultPayMethod, type PayMethod } from "@/lib/snake-pay";
 import PaymentLauncher from "@/lib/payment-launcher";
+import PaymentVerificationManager from "@/lib/payment-verification";
 
 interface Worker {
   id: string;
@@ -41,6 +42,9 @@ export default function TipFlow() {
   const gameRef = useRef<HTMLDivElement>(null);
   const [processingComplete, setProcessingComplete] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'processing' | 'completed' | 'failed' | 'expired'>('pending');
+  const [paymentId, setPaymentId] = useState<string>('');
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Demo worker data
   const demoWorker: Worker = {
@@ -134,21 +138,64 @@ export default function TipFlow() {
     }
   }, [isGameMode]);
 
-  // Handle payment method selection
+  // Handle payment method selection with comprehensive verification
   const handlePaymentSelect = async (method: PayMethod) => {
-    setSelectedMethod(method);
+    if (redirecting) return;
+    
     setRedirecting(true);
+    setSelectedMethod(method);
+    setValidationErrors([]);
+
+    // Validate payment details
+    const verificationManager = PaymentVerificationManager.getInstance();
+    const validation = verificationManager.validatePaymentDetails(selectedAmount, method, worker);
     
+    if (!validation.valid) {
+      setValidationErrors(validation.errors);
+      setRedirecting(false);
+      toast({
+        title: "Payment Validation Failed",
+        description: validation.errors.join(', '),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Generate payment ID and start verification
+    const newPaymentId = `tip_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    setPaymentId(newPaymentId);
+    
+    const verification = await verificationManager.startVerification(newPaymentId, selectedAmount, method);
+    setVerificationStatus(verification.status);
+
+    // Set up verification callback
+    verificationManager.onVerificationUpdate(newPaymentId, (updatedVerification) => {
+      setVerificationStatus(updatedVerification.status);
+      
+      if (updatedVerification.status === 'completed') {
+        setCurrentStep('review');
+        setProcessingComplete(true);
+        setRedirecting(false);
+      } else if (updatedVerification.status === 'failed' || updatedVerification.status === 'expired') {
+        toast({
+          title: "Payment Verification Failed",
+          description: updatedVerification.errorMessage || 'Payment could not be verified',
+          variant: "destructive",
+        });
+        setRedirecting(false);
+      }
+    });
+
     // Store payment intent for return detection
-    const paymentIntent = {
-      method,
-      amount: selectedAmount,
-      workerHandle: worker.handle,
-      timestamp: Date.now(),
-      step: 'redirecting'
-    };
-    
     try {
+      const paymentIntent = {
+        paymentId: newPaymentId,
+        amount: selectedAmount,
+        method,
+        workerId: worker?.id,
+        timestamp: Date.now(),
+        verificationCode: verification.verificationCode
+      };
       localStorage.setItem('tiplink-payment-intent', JSON.stringify(paymentIntent));
     } catch (e) {
       console.warn('Failed to store payment intent:', e);
@@ -158,22 +205,27 @@ export default function TipFlow() {
     const payUrl = worker ? buildPayUrl(method, selectedAmount, worker) : null;
     
     if (method === 'stripe') {
-      // For Stripe, we need to create a checkout session first
+      // For Stripe, create a checkout session with verification tracking
       try {
         const response = await apiRequest("POST", "/api/create-payment-intent", {
           amount: selectedAmount,
-          workerId: worker.id,
-          customerName: 'Anonymous'
+          workerId: worker?.id || 'demo-worker',
+          customerName: 'Anonymous',
+          paymentId: newPaymentId
         });
         
         const data = await response.json();
         if (data.clientSecret) {
+          // Start verification process for Stripe
+          verificationManager.updateVerificationStatus(newPaymentId, 'processing');
+          
           // Redirect to Stripe checkout
-          window.location.href = `/checkout?client_secret=${data.clientSecret}&amount=${selectedAmount}&worker=${worker?.handle}`;
+          window.location.href = `/checkout?client_secret=${data.clientSecret}&amount=${selectedAmount}&worker=${worker?.handle}&payment_id=${newPaymentId}`;
           return;
         }
       } catch (error) {
         console.error('Failed to create Stripe payment:', error);
+        verificationManager.updateVerificationStatus(newPaymentId, 'failed', 'Failed to initialize payment');
         toast({
           title: "Payment Error",
           description: "Failed to initialize payment. Please try again.",
@@ -183,8 +235,9 @@ export default function TipFlow() {
         return;
       }
     } else {
-      // For other methods, redirect to payment app immediately
+      // For external payment apps with comprehensive launcher
       if (!payUrl) {
+        verificationManager.updateVerificationStatus(newPaymentId, 'failed', 'Payment URL could not be generated');
         toast({
           title: "Payment Error",
           description: "Payment method not available. Please try another method.",
@@ -194,42 +247,75 @@ export default function TipFlow() {
         return;
       }
       
-      // Use comprehensive payment launcher
       const launcher = PaymentLauncher.getInstance();
       
-      const success = await launcher.launchPaymentApp({
-        method: method as 'venmo' | 'cashapp' | 'zelle',
-        amount: selectedAmount,
-        handle: method === 'venmo' ? worker.venmoHandle :
-                method === 'cashapp' ? worker.cashappHandle :
-                worker.zelleHandle || worker.zelleEmail,
-        email: worker.zelleEmail,
-        workerName: worker.name,
-        onStatusUpdate: (status) => {
-          console.log('Payment status:', status);
-        },
-        onFallback: (fallbackUrl) => {
-          toast({
-            title: "Payment App",
-            description: `Opening ${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'} - if it doesn't work, try the web version`,
-            action: (
-              <button
-                onClick={() => window.open(fallbackUrl, '_blank')}
-                className="px-3 py-1 bg-accent-start text-white rounded text-sm"
-              >
-                Web Version
-              </button>
-            )
-          });
-        }
-      });
-
-      if (!success) {
-        toast({
-          title: "App Not Available",
-          description: `${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'} app couldn't be opened. Try installing the app or use another method.`,
-          variant: "destructive",
+      try {
+        const success = await launcher.launchPaymentApp({
+          method: method as 'venmo' | 'cashapp' | 'zelle',
+          amount: selectedAmount,
+          handle: method === 'venmo' ? worker?.venmoHandle :
+                  method === 'cashapp' ? worker?.cashappHandle :
+                  worker?.zelleHandle || worker?.zelleEmail,
+          email: worker?.zelleEmail,
+          workerName: worker?.name,
+          onStatusUpdate: (status) => {
+            console.log('Payment status:', status);
+          },
+          onFallback: (fallbackUrl) => {
+            toast({
+              title: "Payment App",
+              description: `Opening ${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'} - if it doesn't work, try the web version`,
+              action: (
+                <button
+                  onClick={() => window.open(fallbackUrl, '_blank')}
+                  className="px-3 py-1 bg-accent-start text-white rounded text-sm"
+                >
+                  Web Version
+                </button>
+              )
+            });
+          }
         });
+
+        if (success) {
+          // Start verification process for external apps
+          verificationManager.updateVerificationStatus(newPaymentId, 'processing');
+          
+          // Start background verification after delay
+          setTimeout(async () => {
+            const verified = await verificationManager.verifyPaymentCompletion(newPaymentId);
+            if (!verified) {
+              // Show manual verification option
+              toast({
+                title: "Verify Payment",
+                description: "Did you complete the payment? Click here to confirm.",
+                action: (
+                  <button
+                    onClick={() => {
+                      verificationManager.markAsVerified(newPaymentId);
+                      setCurrentStep('review');
+                      setProcessingComplete(true);
+                    }}
+                    className="px-3 py-1 bg-green-500 text-white rounded text-sm"
+                  >
+                    Payment Done
+                  </button>
+                )
+              });
+            }
+          }, 8000); // Wait 8 seconds for user to complete payment
+        } else {
+          verificationManager.updateVerificationStatus(newPaymentId, 'failed', 'Payment app could not be opened');
+          toast({
+            title: "App Not Available",
+            description: `${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'} app couldn't be opened. Try installing the app or use another method.`,
+            variant: "destructive",
+          });
+          setRedirecting(false);
+        }
+      } catch (error) {
+        verificationManager.updateVerificationStatus(newPaymentId, 'failed', 'Payment launch failed');
+        console.error('Payment launch error:', error);
         setRedirecting(false);
       }
     }

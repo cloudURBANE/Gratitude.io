@@ -40,6 +40,11 @@ export interface IStorage {
   // QR Scans
   recordQrScan(scan: InsertQrScan): Promise<QrScan>;
   markQrScanConverted(scanId: string, tipId: string): Promise<void>;
+  
+  // Payment verification
+  createPaymentIntent(paymentIntent: any): Promise<any>;
+  getPaymentIntent(paymentId: string): Promise<any>;
+  updatePaymentStatus(paymentId: string, status: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -227,4 +232,33 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Add payment verification methods to DatabaseStorage
+class EnhancedDatabaseStorage extends DatabaseStorage {
+  // In-memory storage for payment verification (demo purposes)
+  private paymentIntents = new Map<string, any>();
+  
+  async createPaymentIntent(paymentIntent: any): Promise<any> {
+    const intent = {
+      ...paymentIntent,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.paymentIntents.set(paymentIntent.paymentId, intent);
+    return intent;
+  }
+
+  async getPaymentIntent(paymentId: string): Promise<any> {
+    return this.paymentIntents.get(paymentId) || null;
+  }
+
+  async updatePaymentStatus(paymentId: string, status: string): Promise<void> {
+    const intent = this.paymentIntents.get(paymentId);
+    if (intent) {
+      intent.status = status;
+      intent.updatedAt = new Date();
+      this.paymentIntents.set(paymentId, intent);
+    }
+  }
+}
+
+export const storage = new EnhancedDatabaseStorage();

@@ -200,21 +200,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe payment intent creation with exact amount handling
+  // Enhanced Stripe payment intent with comprehensive validation and verification
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
-      const { amount, workerId, note, customerName, description } = req.body;
+      const { amount, workerId, note, customerName, description, paymentId } = req.body;
       
-      // Ensure amount is a valid number and convert to cents
+      // Comprehensive validation
       const amountInCents = Math.round(parseFloat(amount) * 100);
       
-      if (isNaN(amountInCents) || amountInCents < 50) { // Stripe minimum is 50 cents
+      if (isNaN(amountInCents) || amountInCents < 50) {
         return res.status(400).json({ 
-          message: "Invalid amount. Minimum is $0.50" 
+          message: "Invalid amount. Minimum is $0.50",
+          code: "INVALID_AMOUNT"
         });
       }
 
-      // Create Stripe payment intent with exact amount
+      if (amountInCents > 100000) { // $1000 max
+        return res.status(400).json({ 
+          message: "Amount exceeds maximum limit of $1000",
+          code: "AMOUNT_TOO_HIGH"
+        });
+      }
+
+      // Store payment intent for verification tracking
+      if (paymentId) {
+        try {
+          await storage.createPaymentIntent({
+            paymentId,
+            amount: amountInCents / 100,
+            workerId: workerId || "demo-worker",
+            customerName: customerName || "Anonymous",
+            status: 'pending',
+            method: 'stripe'
+          });
+        } catch (dbError) {
+          console.warn('Failed to store payment intent:', dbError);
+        }
+      }
+
+      // Create Stripe payment intent with comprehensive metadata
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amountInCents,
         currency: "usd",
@@ -227,17 +251,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
           note: note || '',
           customerName: customerName || 'Anonymous',
           tip_amount: (amountInCents / 100).toFixed(2),
+          paymentId: paymentId || `stripe_${Date.now()}`,
+          timestamp: Date.now().toString(),
+          type: "tip"
         },
       });
+
+      // Update storage with Stripe payment intent ID
+      if (paymentId) {
+        try {
+          const payment = await storage.getPaymentIntent(paymentId);
+          if (payment) {
+            payment.stripePaymentIntentId = paymentIntent.id;
+            await storage.updatePaymentStatus(paymentId, 'processing');
+          }
+        } catch (error) {
+          console.warn('Failed to update payment with Stripe ID:', error);
+        }
+      }
 
       res.json({ 
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
-        amount: amountInCents / 100 // Return the exact amount for verification
+        amount: amountInCents / 100,
+        status: 'created',
+        paymentId: paymentId
       });
     } catch (error: any) {
       console.error("Stripe payment intent error:", error);
-      res.status(500).json({ message: "Error creating payment intent: " + error.message });
+      res.status(500).json({ 
+        message: "Error creating payment intent: " + error.message,
+        code: "STRIPE_ERROR"
+      });
+    }
+  });
+
+  // Payment verification endpoint
+  app.post("/api/payments/:paymentId/verify", async (req, res) => {
+    try {
+      const { paymentId } = req.params;
+      
+      const payment = await storage.getPaymentIntent(paymentId);
+      
+      if (!payment) {
+        return res.status(404).json({ 
+          verified: false, 
+          message: "Payment not found" 
+        });
+      }
+
+      // For Stripe payments, verify with Stripe API
+      if (payment.method === 'stripe' && payment.stripePaymentIntentId) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
+          
+          if (paymentIntent.status === 'succeeded') {
+            await storage.updatePaymentStatus(paymentId, 'completed');
+            return res.json({ 
+              verified: true, 
+              status: 'completed',
+              amount: paymentIntent.amount / 100
+            });
+          }
+        } catch (stripeError) {
+          console.warn('Stripe verification failed:', stripeError);
+        }
+      }
+
+      if (payment.status === 'completed') {
+        return res.json({ 
+          verified: true, 
+          status: 'completed',
+          amount: payment.amount 
+        });
+      }
+
+      res.json({ 
+        verified: false, 
+        status: payment.status,
+        message: "Payment not yet completed" 
+      });
+      
+    } catch (error: any) {
+      console.error("Payment verification error:", error);
+      res.status(500).json({ 
+        verified: false, 
+        message: "Verification failed", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Manual payment confirmation for external apps
+  app.post("/api/payments/:paymentId/confirm", async (req, res) => {
+    try {
+      const { paymentId } = req.params;
+      
+      const payment = await storage.getPaymentIntent(paymentId);
+      
+      if (!payment) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Payment not found" 
+        });
+      }
+
+      await storage.updatePaymentStatus(paymentId, 'completed');
+      
+      // Create tip record
+      try {
+        await storage.createTip({
+          amount: payment.amount,
+          method: payment.method,
+          workerId: payment.workerId,
+          paymentIntentId: paymentId,
+          status: 'completed'
+        });
+      } catch (tipError) {
+        console.warn('Failed to create tip record:', tipError);
+      }
+
+      res.json({ 
+        success: true, 
+        message: "Payment confirmed",
+        amount: payment.amount 
+      });
+      
+    } catch (error: any) {
+      console.error("Payment confirmation error:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Confirmation failed", 
+        error: error.message 
+      });
     }
   });
 
