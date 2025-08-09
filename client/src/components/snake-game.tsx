@@ -47,11 +47,20 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
   // Random food placement
   const generateFood = useCallback((currentSnake: Cell[]): Cell => {
     let newFood: Cell;
+    let attempts = 0;
     do {
+      // Generate food away from edges for better animation visibility
+      const margin = 2; // Keep food 2 tiles away from edges for sparkle animations
+      const safeWidth = COLS - margin * 2;
+      const safeHeight = ROWS - margin * 2;
+      
       newFood = {
-        x: Math.floor(Math.random() * COLS),
-        y: Math.floor(Math.random() * ROWS)
+        x: margin + Math.floor(Math.random() * safeWidth),
+        y: margin + Math.floor(Math.random() * safeHeight)
       };
+      attempts++;
+      // Prevent infinite loop if snake fills most of the board
+      if (attempts > 100) break;
     } while (currentSnake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
     return newFood;
   }, []);
@@ -129,11 +138,11 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
     };
 
     if (gameActive && !paused && alive) {
-      // Prevent screen scrolling during gameplay
+      // Add body class but don't prevent all scrolling to avoid view snapping
       document.body.classList.add('game-active');
       requestWakeLock();
     } else {
-      // Remove scroll prevention when game is inactive
+      // Remove class when game is inactive
       document.body.classList.remove('game-active');
     }
 
@@ -468,16 +477,23 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
     let isActive = false;
 
     const handleTouchStart = (e: TouchEvent) => {
-      e.preventDefault(); // Prevent scrolling
       const touch = e.touches[0];
       startX = touch.clientX;
       startY = touch.clientY;
       isActive = true;
+      // Only prevent default for game touches, not general page interaction
+      if (e.target === canvas) {
+        e.preventDefault();
+      }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault(); // Prevent scrolling
       if (!isActive) return;
+      
+      // Only prevent default for canvas touches
+      if (e.target === canvas) {
+        e.preventDefault();
+      }
       
       const touch = e.touches[0];
       const deltaX = touch.clientX - startX;
@@ -495,8 +511,11 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
-      e.preventDefault(); // Prevent scrolling
       isActive = false;
+      // Only prevent default for canvas touches
+      if (e.target === canvas) {
+        e.preventDefault();
+      }
     };
 
     canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
