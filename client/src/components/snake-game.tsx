@@ -157,7 +157,9 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
 
     setGameActive(true);
     let lastTime = performance.now();
-    const tickInterval = Math.max(80, TICK_MS_BASE - score * 2);
+    // Speed increases subtly after $5 earned, then accelerates further
+    const speedBoost = score >= 5 ? Math.floor((score - 5) / 3) * 8 : 0;
+    const tickInterval = Math.max(70, TICK_MS_BASE - score * 1.5 - speedBoost);
 
     const gameLoop = (currentTime: number) => {
       if (currentTime - lastTime >= tickInterval) {
@@ -191,62 +193,208 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
     canvas.style.height = `${dims.cssH}px`;
     ctx.scale(dpr, dpr);
 
-    // Clear canvas
-    ctx.fillStyle = "rgba(0, 0, 0, 0.1)";
+    // Clear canvas with gradient background
+    const gradient = ctx.createRadialGradient(dims.cssW/2, dims.cssH/2, 0, dims.cssW/2, dims.cssH/2, Math.max(dims.cssW, dims.cssH)/2);
+    gradient.addColorStop(0, "rgba(139, 69, 255, 0.05)");
+    gradient.addColorStop(1, "rgba(6, 182, 212, 0.02)");
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, dims.cssW, dims.cssH);
 
-    // Draw subtle grid
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    // Draw animated border with pulsing effect
+    const time = Date.now() * 0.001;
+    const borderPulse = 0.3 + Math.sin(time) * 0.1;
+    
+    // Outer border with glow
+    ctx.save();
+    ctx.strokeStyle = `rgba(139, 69, 255, ${borderPulse})`;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = "rgba(139, 69, 255, 0.5)";
+    ctx.shadowBlur = 10;
+    ctx.strokeRect(2, 2, dims.cssW - 4, dims.cssH - 4);
+    ctx.restore();
+
+    // Inner decorative corners
+    const cornerSize = tile * 0.8;
+    ctx.strokeStyle = `rgba(6, 182, 212, ${borderPulse * 0.7})`;
+    ctx.lineWidth = 2;
+    
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(8, 8 + cornerSize);
+    ctx.lineTo(8, 8);
+    ctx.lineTo(8 + cornerSize, 8);
+    ctx.stroke();
+    
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(dims.cssW - 8 - cornerSize, 8);
+    ctx.lineTo(dims.cssW - 8, 8);
+    ctx.lineTo(dims.cssW - 8, 8 + cornerSize);
+    ctx.stroke();
+    
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(8, dims.cssH - 8 - cornerSize);
+    ctx.lineTo(8, dims.cssH - 8);
+    ctx.lineTo(8 + cornerSize, dims.cssH - 8);
+    ctx.stroke();
+    
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(dims.cssW - 8 - cornerSize, dims.cssH - 8);
+    ctx.lineTo(dims.cssW - 8, dims.cssH - 8);
+    ctx.lineTo(dims.cssW - 8, dims.cssH - 8 - cornerSize);
+    ctx.stroke();
+
+    // Draw subtle grid with fading effect
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
     ctx.lineWidth = 1;
-    for (let x = 0; x <= COLS; x++) {
+    for (let x = 1; x < COLS; x++) {
       ctx.beginPath();
-      ctx.moveTo(x * tile, 0);
-      ctx.lineTo(x * tile, dims.cssH);
+      ctx.moveTo(x * tile, 6);
+      ctx.lineTo(x * tile, dims.cssH - 6);
       ctx.stroke();
     }
-    for (let y = 0; y <= ROWS; y++) {
+    for (let y = 1; y < ROWS; y++) {
       ctx.beginPath();
-      ctx.moveTo(0, y * tile);
-      ctx.lineTo(dims.cssW, y * tile);
+      ctx.moveTo(6, y * tile);
+      ctx.lineTo(dims.cssW - 6, y * tile);
       ctx.stroke();
     }
 
-    // Draw food (dollar sign)
+    // Draw animated food (glowing dollar sign with sparkles)
     const foodX = food.x * tile + tile / 2;
     const foodY = food.y * tile + tile / 2;
+    const foodTime = Date.now() * 0.003;
+    const foodPulse = 0.8 + Math.sin(foodTime * 2) * 0.2;
     
     ctx.save();
+    
+    // Outer glow ring
+    ctx.beginPath();
+    ctx.arc(foodX, foodY, tile * 0.4 * foodPulse, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(16, 185, 129, ${0.2 * foodPulse})`;
+    ctx.fill();
+    
+    // Inner dollar sign with glow
     ctx.shadowColor = "#10B981";
-    ctx.shadowBlur = 8;
-    ctx.fillStyle = "#10B981";
-    ctx.font = `bold ${tile * 0.6}px Arial`;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = `rgba(16, 185, 129, ${foodPulse})`;
+    ctx.font = `bold ${tile * 0.7}px Arial`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("$", foodX, foodY);
+    
+    // Sparkle effects around food
+    for (let i = 0; i < 4; i++) {
+      const sparkleAngle = foodTime + (i * Math.PI / 2);
+      const sparkleDistance = tile * 0.6;
+      const sparkleX = foodX + Math.cos(sparkleAngle) * sparkleDistance;
+      const sparkleY = foodY + Math.sin(sparkleAngle) * sparkleDistance;
+      const sparkleSize = 2 + Math.sin(foodTime * 3 + i) * 1;
+      
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(16, 185, 129, ${0.4 + Math.sin(foodTime * 2 + i) * 0.3})`;
+      ctx.fill();
+    }
+    
     ctx.restore();
 
-    // Draw snake
+    // Draw beautiful snake with gradient and animation
+    const snakeTime = Date.now() * 0.002;
+    
     snake.forEach((segment, index) => {
       const x = segment.x * tile + 2;
       const y = segment.y * tile + 2;
       const size = tile - 4;
       const isHead = index === 0;
+      const isTail = index === snake.length - 1;
 
       ctx.save();
       
       if (isHead) {
+        // Animated head with breathing effect
+        const headPulse = 1 + Math.sin(snakeTime * 4) * 0.05;
+        const headSize = size * headPulse;
+        const headOffset = (size - headSize) / 2;
+        
+        // Head glow
         ctx.shadowColor = "#8B45FF";
-        ctx.shadowBlur = 6;
+        ctx.shadowBlur = 15;
+        
+        // Head gradient
+        const headGradient = ctx.createRadialGradient(
+          x + size/2, y + size/2, 0,
+          x + size/2, y + size/2, size/2
+        );
+        headGradient.addColorStop(0, "#A855F7");
+        headGradient.addColorStop(1, "#8B45FF");
+        
+        ctx.fillStyle = headGradient;
+        ctx.beginPath();
+        ctx.roundRect(x + headOffset, y + headOffset, headSize, headSize, 4);
+        ctx.fill();
+        
+        // Animated eyes with direction
         ctx.fillStyle = "#FFFFFF";
+        const eyeSize = size * 0.2;
+        const eyePulse = 0.8 + Math.sin(snakeTime * 6) * 0.2;
+        const eyeActualSize = eyeSize * eyePulse;
+        
+        let eye1X, eye1Y, eye2X, eye2Y;
+        
+        if (dir === "up") {
+          eye1X = x + size * 0.25; eye1Y = y + size * 0.3;
+          eye2X = x + size * 0.55; eye2Y = y + size * 0.3;
+        } else if (dir === "down") {
+          eye1X = x + size * 0.25; eye1Y = y + size * 0.5;
+          eye2X = x + size * 0.55; eye2Y = y + size * 0.5;
+        } else if (dir === "left") {
+          eye1X = x + size * 0.2; eye1Y = y + size * 0.25;
+          eye2X = x + size * 0.2; eye2Y = y + size * 0.55;
+        } else {
+          eye1X = x + size * 0.6; eye1Y = y + size * 0.25;
+          eye2X = x + size * 0.6; eye2Y = y + size * 0.55;
+        }
+        
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, eyeActualSize, 0, Math.PI * 2);
+        ctx.arc(eye2X, eye2Y, eyeActualSize, 0, Math.PI * 2);
+        ctx.fill();
+        
       } else {
-        ctx.shadowColor = "#06B6D4";
-        ctx.shadowBlur = 4;
-        ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        // Body segments with flowing gradient
+        const segmentProgress = index / snake.length;
+        const flowOffset = snakeTime + index * 0.5;
+        const bodyPulse = 0.95 + Math.sin(flowOffset) * 0.05;
+        const bodySize = size * bodyPulse;
+        const bodyOffset = (size - bodySize) / 2;
+        
+        // Body gradient that flows along the snake
+        const bodyGradient = ctx.createLinearGradient(x, y, x + size, y + size);
+        const hue1 = (270 + Math.sin(flowOffset) * 30) % 360; // Purple to blue range
+        const hue2 = (200 + Math.sin(flowOffset + 1) * 30) % 360;
+        
+        bodyGradient.addColorStop(0, `hsl(${hue1}, 70%, ${60 + segmentProgress * 10}%)`);
+        bodyGradient.addColorStop(1, `hsl(${hue2}, 80%, ${50 + segmentProgress * 15}%)`);
+        
+        ctx.shadowColor = `hsla(${hue1}, 70%, 60%, 0.4)`;
+        ctx.shadowBlur = 6 + Math.sin(flowOffset) * 2;
+        ctx.fillStyle = bodyGradient;
+        
+        if (isTail) {
+          // Tapered tail
+          ctx.beginPath();
+          ctx.roundRect(x + bodyOffset, y + bodyOffset, bodySize, bodySize, bodySize * 0.4);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.roundRect(x + bodyOffset, y + bodyOffset, bodySize, bodySize, 3);
+          ctx.fill();
+        }
       }
-
-      ctx.beginPath();
-      ctx.roundRect(x, y, size, size, 4);
-      ctx.fill();
+      
       ctx.restore();
     });
   }, [snake, food, tile, dims]);
@@ -442,15 +590,28 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: [0.4, 0.0, 0.2, 1] }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="text-lg font-semibold text-text-primary">Play to Tip</h3>
-          <p className="text-sm text-text-secondary">Eat $ to earn tips</p>
+      {/* Header with game explanation */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-lg font-semibold text-text-primary">Play to Tip</h3>
+            <p className="text-sm text-text-secondary">Guide snake to collect $</p>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-accent-start">${tipAmount}</div>
+            <div className="text-xs text-text-secondary flex items-center gap-1 justify-end">
+              {score >= 5 && <div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></div>}
+              {score >= 5 ? "Speed Boost!" : `${5 - score} more to boost`}
+            </div>
+          </div>
         </div>
-        <div className="text-right">
-          <div className="text-2xl font-bold text-accent-start">${tipAmount}</div>
-          <div className="text-xs text-text-secondary">Score: {score}</div>
+        
+        {/* Game explanation */}
+        <div className="bg-glass backdrop-blur-sm border border-glass-border rounded-lg p-3 mb-4">
+          <p className="text-sm text-text-secondary text-center">
+            🐍 Each <span className="text-green-400 font-semibold">$</span> collected = $1 tip • 
+            Speed increases after $5 • Use arrows or swipe to control
+          </p>
         </div>
       </div>
 
@@ -600,9 +761,17 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
         </>
       )}
 
-      {/* Instructions */}
-      <div className="mt-4 text-xs text-text-secondary text-center">
-        Swipe or arrow keys to move • Space to pause • R to restart
+      {/* Game Status */}
+      <div className="mt-4 text-center">
+        {score >= 5 && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full mb-2">
+            <div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></div>
+            <span className="text-xs text-red-300 font-medium">SPEED BOOST ACTIVE</span>
+          </div>
+        )}
+        <div className="text-xs text-text-secondary">
+          Swipe or arrow keys to move • Space to pause • R to restart
+        </div>
       </div>
 
       {/* Zelle modal */}
