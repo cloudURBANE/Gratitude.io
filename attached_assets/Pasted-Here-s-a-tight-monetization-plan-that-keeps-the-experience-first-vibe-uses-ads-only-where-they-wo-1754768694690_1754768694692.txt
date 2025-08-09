@@ -1,0 +1,101 @@
+Here’s a tight monetization plan that keeps the “experience-first” vibe, uses ads only where they won’t hurt tips, and gives a clear Pro path.
+
+Model (simple + defensible)
+
+Free (ad-supported)
+	•	1 TipLink, default theme, basic deep links.
+	•	Ads only after the payment handoff (on the “return” / “thanks” screen) and on the worker’s dashboard.
+	•	“Powered by TipVault” badge.
+
+Pro
+	•	$4.99/mo or $35/yr.
+	•	No ads anywhere.
+	•	Custom handle/branding, NFC/QR generator pack, link shortener, venue/day insights, Wallet pass, team-split, export CSV, remove badge.
+
+Add-on store (any tier)
+	•	NFC tap card + 20 QR minis: $15 kit (your cost ~$6–8 → margin $7–9).
+	•	Extra profiles ($2/mo each).
+	•	Custom domain ($3/mo).
+
+⸻
+
+Where the money comes from
+
+1) Subscriptions (primary)
+	•	Target: 10–15% of active users convert to Pro.
+	•	Free is great for lead-gen; Pro is the engine.
+
+2) Ads (secondary, non-intrusive)
+	•	Placement:
+	•	Return screen only (after they come back from Venmo/Cash App/Card).
+	•	Worker dashboard side panel.
+	•	Never on the pre-tip page (protects conversion).
+	•	Format: 1 small contextual native card (e.g., rideshare, food, banking).
+	•	Frequency cap: max 1 impression per session per visitor.
+	•	Fallback: your own “house ads” (QR kits/NFC, Pro upgrade) when no fill.
+
+3) Kits & upsells (high margin, simple ops)
+	•	QR/NFC kits, vinyl stickers, lanyards.
+
+⸻
+
+Experiential guardrails (so ads don’t ruin it)
+	•	Tip flow stays 2 taps; ads appear only after money is sent (or dismissed if the user never returns).
+	•	In-app browser detection: if handoff fails and visitor never leaves, hide ads—help them open Safari/Chrome instead.
+	•	Respect prefers-reduced-motion and keep the return ad static.
+
+⸻
+
+Implementation (web app details, concise)
+
+DB
+	•	users(id, plan: "free"|"pro", created_at, …)
+	•	profiles(user_id, handle, payments…)
+	•	impressions(id, handle, slot, ad_id, ts, ip_hash)
+	•	purchases(user_id, sku, amount, ts)
+
+Feature flags
+	•	isPro = user.plan === "pro"
+	•	canShowAds = !isPro
+
+Ad decision
+	•	Server-side function chooseAd({slot:"return", city, device, time})
+	•	Prioritize house offers → affiliate/contextual network → none.
+	•	Return {title, body, cta, url, trackingPixel?}.
+
+UI slots
+	•	<AdSlot slot="return" /> on /success only.
+	•	<AdSlot slot="dashboard_side" /> in worker UI.
+
+Privacy
+	•	No third-party scripts on the tip page; render ad as static HTML from your server.
+	•	If you later add personalized ads, show a tiny consent toggle on the return screen; default to contextual.
+
+Pro gating
+	•	Middleware checks plan; hides <AdSlot> and badge for Pro.
+	•	Upgrade flow: Stripe Checkout (monthly/yearly) + proration disabled.
+
+House ad examples
+	•	“Make this page ad-free with TipVault Pro.”
+	•	“Get your NFC tap card kit (tap to open payment with $ prefilled).”
+
+⸻
+
+Quick, realistic math (so you know what to expect)
+	•	Ads: contextual CPM ~$1–$4. If a worker’s page gets ~1,500 return views/month → ~$1.5–$6 gross/month. (Good for you at scale, not for an individual user.)
+	•	Subs: 100 paying users × $35/yr ≈ $3,500/yr; 500 → $17,500/yr (before Stripe fees).
+	•	Kits: 100 kits/month × ~$8 margin ≈ $800/mo.
+
+Conclusion: Subs + kits drive profit; ads are gravy and should never touch the pre-tip experience.
+
+⸻
+
+Ship list (in order)
+	1.	Add plan to users; hide <AdSlot> when Pro.
+	2.	Build /success return screen with One-Tap Review + single AdSlot.
+	3.	Add Stripe upgrade (monthly/yearly) + “remove ads” CTA.
+	4.	Add Kit store (Stripe Products).
+	5.	Add affiliate/house ad service and basic reporting.
+	6.	Later: run small A/Bs on return-screen copy (never the tip flow).
+
+If you want, I’ll wire <AdSlot>, the Pro toggle, and a starter house-ad into your Next.js project so you can see it working end-to-end.

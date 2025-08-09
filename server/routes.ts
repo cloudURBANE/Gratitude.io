@@ -382,7 +382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         await storage.createTip({
           amount: payment.amount,
-          method: payment.method,
+          paymentMethod: payment.method,
           workerId: payment.workerId,
           paymentIntentId: paymentId,
           status: 'completed'
@@ -456,6 +456,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(tips);
     } catch (error: any) {
       res.status(500).json({ message: "Error fetching tips: " + error.message });
+    }
+  });
+
+  // QR Code Generation Endpoints
+  app.post("/api/qr/generate", async (req, res) => {
+    try {
+      const { handle, options = {} } = req.body;
+      
+      if (!handle) {
+        return res.status(400).json({ error: "Handle is required" });
+      }
+
+      // Verify worker exists
+      const worker = await storage.getWorkerByHandle(handle);
+      if (!worker) {
+        return res.status(404).json({ error: "Worker not found" });
+      }
+
+      const baseUrl = req.protocol + '://' + req.get('host');
+      const tipPageUrl = `${baseUrl}/u/${handle}`;
+      
+      const qrOptions: any = {
+        errorCorrectionLevel: options.errorCorrectionLevel || 'M',
+        type: 'image/png' as const,
+        margin: options.margin || 4,
+        color: {
+          dark: options.foregroundColor || '#10b981',
+          light: options.backgroundColor || '#ffffff',
+        },
+        width: options.size || 512,
+      };
+
+      const qrDataUrl = await QRCode.toDataURL(tipPageUrl, qrOptions);
+
+      // Update worker's QR code URL in database
+      await storage.updateWorker(worker.id, { qrCodeUrl: qrDataUrl });
+
+      res.json({
+        success: true,
+        qrCode: qrDataUrl,
+        url: tipPageUrl,
+        handle: handle
+      });
+    } catch (error: any) {
+      console.error("QR generation error:", error);
+      res.status(500).json({ 
+        error: "Failed to generate QR code", 
+        message: error.message 
+      });
+    }
+  });
+
+  app.get("/api/qr/:handle", async (req, res) => {
+    try {
+      const { handle } = req.params;
+      
+      const worker = await storage.getWorkerByHandle(handle);
+      if (!worker) {
+        return res.status(404).json({ error: "Worker not found" });
+      }
+
+      if (worker.qrCodeUrl) {
+        res.json({
+          success: true,
+          qrCode: worker.qrCodeUrl,
+          url: `${req.protocol}://${req.get('host')}/u/${handle}`,
+          handle: handle,
+          cached: true
+        });
+      } else {
+        // Generate QR code if not exists
+        const baseUrl = req.protocol + '://' + req.get('host');
+        const tipPageUrl = `${baseUrl}/u/${handle}`;
+        
+        const qrDataUrl = await QRCode.toDataURL(tipPageUrl, {
+          errorCorrectionLevel: 'M' as any,
+          type: 'image/png' as const,
+          margin: 4,
+          color: {
+            dark: '#10b981',
+            light: '#ffffff',
+          },
+          width: 512,
+        } as any);
+
+        // Cache the generated QR code
+        await storage.updateWorker(worker.id, { qrCodeUrl: qrDataUrl });
+
+        res.json({
+          success: true,
+          qrCode: qrDataUrl,
+          url: tipPageUrl,
+          handle: handle,
+          cached: false
+        });
+      }
+    } catch (error: any) {
+      console.error("QR retrieval error:", error);
+      res.status(500).json({ 
+        error: "Failed to retrieve QR code", 
+        message: error.message 
+      });
     }
   });
 

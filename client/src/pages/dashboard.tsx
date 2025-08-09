@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
 import ImageUploader from "@/components/image-uploader";
+import QRCodeManager from "@/components/qr-code-manager";
 
 interface UserData {
   id: string;
@@ -466,7 +467,13 @@ export default function Dashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-6"
               >
-                <h2 className="text-3xl font-bold text-white">QR Code & Links</h2>
+                <QRCodeManager 
+                  handle={user.handle || 'demo'}
+                  workerName={user.name}
+                  onQRGenerated={(qrCode) => {
+                    console.log('QR Code generated:', qrCode);
+                  }}
+                />
 
                 <div className="grid md:grid-cols-2 gap-6">
                   <GlassCard className="p-6">
