@@ -10,31 +10,31 @@ interface AdSlotProps {
   onAdClicked?: (adId: string) => void;
 }
 
-// Sample ad data - in production this would come from an ad network API
+// Smart revenue opportunities - contextual and helpful, not intrusive
 const adData = {
   return: {
     id: "ad_return_001",
-    title: "Get More Tips with Pro",
-    description: "Upgrade to Pro for unlimited tip pages and advanced analytics. 7-day free trial!",
-    cta: "Start Free Trial",
-    bgGradient: "from-green-600 to-emerald-600",
-    icon: "💰"
+    title: "Upgrade to unlock more features",
+    description: "Get unlimited tip pages, advanced analytics, and custom branding with Pro.",
+    cta: "Explore Pro",
+    bgGradient: "from-blue-600 to-blue-700",
+    icon: "✨"
   },
   dashboard_side: {
     id: "ad_dashboard_001", 
-    title: "NFC Tap Cards",
-    description: "Instant tips with just a tap. Order your custom NFC cards today.",
-    cta: "Order Now",
-    bgGradient: "from-blue-600 to-purple-600",
-    icon: "📱"
+    title: "Custom QR Codes",
+    description: "Professional QR codes with your branding. Increase tips by 45%.",
+    cta: "Create QR Code",
+    bgGradient: "from-gray-700 to-gray-800",
+    icon: "📊"
   },
   tip_page_footer: {
     id: "ad_footer_001",
-    title: "QR Code Generator",
-    description: "Create beautiful QR codes for your tip page in seconds.",
-    cta: "Generate QR",
-    bgGradient: "from-purple-600 to-pink-600", 
-    icon: "🔗"
+    title: "Analytics Insights",
+    description: "Track your best-performing hours and optimize your earnings.",
+    cta: "View Analytics",
+    bgGradient: "from-green-600 to-green-700", 
+    icon: "📈"
   }
 };
 
@@ -69,18 +69,18 @@ export default function AdSlot({ slot, className, onImpressionTracked, onAdClick
   return (
     <AnimatePresence>
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
+        exit={{ opacity: 0, scale: 0.98 }}
         className={className}
       >
-        <GlassCard className="relative p-4 cursor-pointer group hover:scale-105 transition-transform duration-200">
+        <div className="relative bg-white border border-gray-200 rounded-xl p-4 cursor-pointer group hover:shadow-lg transition-all duration-200">
           {/* Close button */}
           <button
             onClick={handleClose}
-            className="absolute top-2 right-2 w-6 h-6 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-2 right-2 w-6 h-6 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
           >
-            <X size={12} className="text-white" />
+            <X size={12} className="text-gray-600" />
           </button>
 
           <div onClick={handleClick} className="space-y-3">
@@ -91,10 +91,10 @@ export default function AdSlot({ slot, className, onImpressionTracked, onAdClick
               </div>
               
               <div className="flex-1 min-w-0">
-                <h4 className="font-semibold text-white text-sm truncate">
+                <h4 className="font-semibold text-gray-900 text-sm truncate">
                   {ad.title}
                 </h4>
-                <p className="text-gray-300 text-xs leading-tight">
+                <p className="text-gray-600 text-xs leading-tight">
                   {ad.description}
                 </p>
               </div>
@@ -102,14 +102,14 @@ export default function AdSlot({ slot, className, onImpressionTracked, onAdClick
 
             {/* CTA */}
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400 italic">sponsored</span>
-              <div className={`bg-gradient-to-r ${ad.bgGradient} px-3 py-1 rounded-full flex items-center gap-1`}>
+              <span className="text-xs text-gray-400">Suggested feature</span>
+              <div className={`bg-gradient-to-r ${ad.bgGradient} px-3 py-1 rounded-lg flex items-center gap-1`}>
                 <span className="text-white text-xs font-medium">{ad.cta}</span>
                 <ExternalLink size={10} className="text-white" />
               </div>
             </div>
           </div>
-        </GlassCard>
+        </div>
       </motion.div>
     </AnimatePresence>
   );

@@ -12,10 +12,10 @@ interface ProUpgradeModalProps {
 }
 
 const triggerMessages = {
-  tip_limit: "You've reached the free plan limit of 1 tip page. Upgrade to create unlimited pages!",
-  analytics_limit: "Advanced analytics are available with Pro. Get deeper insights into your earnings!",
-  customization_limit: "Custom branding and themes require Pro. Make your tip page uniquely yours!",
-  ads_annoyance: "Remove ads and get a premium experience with TipVault Pro!"
+  tip_limit: "Ready to create more tip pages? Upgrade to Pro for unlimited pages and advanced features.",
+  analytics_limit: "Unlock detailed analytics to optimize your earnings and understand customer patterns.",
+  customization_limit: "Make your tip page stand out with custom branding and professional themes.",
+  ads_annoyance: "Focus on what matters most - upgrade to Pro for a distraction-free experience."
 };
 
 const proFeatures = [
@@ -47,20 +47,20 @@ export default function ProUpgradeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
         className="w-full max-w-2xl max-h-[90vh] overflow-y-auto"
       >
-        <GlassCard className="p-8 relative">
+        <div className="bg-white rounded-2xl p-8 relative shadow-2xl">
           {/* Close button */}
           <button
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition-colors"
+            className="absolute top-4 right-4 w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-full flex items-center justify-center transition-colors"
           >
-            <X size={16} className="text-white" />
+            <X size={16} className="text-gray-600" />
           </button>
 
           {/* Header */}
@@ -69,23 +69,23 @@ export default function ProUpgradeModal({
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring" }}
-              className="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto"
+              className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center mx-auto"
             >
               <Crown size={24} className="text-white" />
             </motion.div>
             
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-              Upgrade to TipVault Pro
+            <h2 className="text-3xl font-bold text-gray-900">
+              Unlock TipVault Pro
             </h2>
             
-            <p className="text-gray-300 text-lg max-w-lg mx-auto">
+            <p className="text-gray-600 text-lg max-w-lg mx-auto">
               {triggerMessages[trigger]}
             </p>
           </div>
 
           {/* Plan Selection */}
           <div className="space-y-6 mb-8">
-            <h3 className="text-xl font-semibold text-white text-center">Choose Your Plan</h3>
+            <h3 className="text-xl font-semibold text-gray-900 text-center">Choose Your Plan</h3>
             
             <div className="grid gap-4">
               {/* Monthly Plan */}
@@ -93,19 +93,19 @@ export default function ProUpgradeModal({
                 whileHover={{ scale: 1.02 }}
                 className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
                   selectedPlan === "monthly" 
-                    ? "border-blue-500 bg-blue-600/20" 
-                    : "border-white/20 bg-white/5"
+                    ? "border-blue-500 bg-blue-50" 
+                    : "border-gray-200 bg-gray-50"
                 }`}
                 onClick={() => setSelectedPlan("monthly")}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-semibold text-white">Pro Monthly</h4>
-                    <p className="text-gray-300 text-sm">Perfect for getting started</p>
+                    <h4 className="font-semibold text-gray-900">Pro Monthly</h4>
+                    <p className="text-gray-600 text-sm">Perfect for getting started</p>
                   </div>
                   <div className="text-right">
-                    <div className="text-2xl font-bold text-white">$4.99</div>
-                    <div className="text-gray-300 text-sm">per month</div>
+                    <div className="text-2xl font-bold text-gray-900">$4.99</div>
+                    <div className="text-gray-600 text-sm">per month</div>
                   </div>
                 </div>
               </motion.div>
@@ -115,8 +115,8 @@ export default function ProUpgradeModal({
                 whileHover={{ scale: 1.02 }}
                 className={`p-4 rounded-xl border-2 cursor-pointer transition-all relative ${
                   selectedPlan === "yearly" 
-                    ? "border-green-500 bg-green-600/20" 
-                    : "border-white/20 bg-white/5"
+                    ? "border-green-500 bg-green-50" 
+                    : "border-gray-200 bg-gray-50"
                 }`}
                 onClick={() => setSelectedPlan("yearly")}
               >
@@ -128,15 +128,15 @@ export default function ProUpgradeModal({
                 
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-semibold text-white">Pro Yearly</h4>
-                    <p className="text-gray-300 text-sm">Best value - 2 months free!</p>
+                    <h4 className="font-semibold text-gray-900">Pro Yearly</h4>
+                    <p className="text-gray-600 text-sm">Best value - 2 months free!</p>
                   </div>
                   <div className="text-right">
                     <div className="flex items-center gap-2">
                       <span className="text-lg text-gray-400 line-through">$59.88</span>
-                      <div className="text-2xl font-bold text-white">$35</div>
+                      <div className="text-2xl font-bold text-gray-900">$35</div>
                     </div>
-                    <div className="text-gray-300 text-sm">per year</div>
+                    <div className="text-gray-600 text-sm">per year</div>
                   </div>
                 </div>
               </motion.div>
@@ -145,8 +145,8 @@ export default function ProUpgradeModal({
 
           {/* Features List */}
           <div className="space-y-4 mb-8">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <TrendingUp size={20} className="text-green-400" />
+            <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <TrendingUp size={20} className="text-blue-600" />
               Everything you get with Pro:
             </h3>
             
@@ -159,8 +159,8 @@ export default function ProUpgradeModal({
                   transition={{ delay: 0.1 * index }}
                   className="flex items-center gap-2"
                 >
-                  <Check size={16} className="text-green-400 flex-shrink-0" />
-                  <span className="text-gray-300 text-sm">{feature}</span>
+                  <Check size={16} className="text-blue-600 flex-shrink-0" />
+                  <span className="text-gray-700 text-sm">{feature}</span>
                 </motion.div>
               ))}
             </div>
@@ -170,26 +170,26 @@ export default function ProUpgradeModal({
           <div className="space-y-4">
             <Button
               onClick={handleUpgrade}
-              className="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold py-3 text-lg"
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 text-lg"
             >
               <Crown size={20} className="mr-2" />
               Upgrade to Pro {selectedPlan === "yearly" ? "Yearly" : "Monthly"}
             </Button>
             
             <div className="text-center space-y-2">
-              <p className="text-gray-400 text-sm">
+              <p className="text-gray-600 text-sm">
                 7-day free trial • Cancel anytime • 30-day money-back guarantee
               </p>
               
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-white text-sm underline transition-colors"
+                className="text-gray-500 hover:text-gray-700 text-sm underline transition-colors"
               >
                 Maybe later
               </button>
             </div>
           </div>
-        </GlassCard>
+        </div>
       </motion.div>
     </div>
   );

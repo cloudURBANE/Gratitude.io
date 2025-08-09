@@ -47,25 +47,25 @@ export default function BusinessDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState("30d");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-purple-900/30">
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
-        
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between mb-8"
-        >
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">Business Dashboard</h1>
-            <p className="text-gray-300">Monitor your TipVault platform performance</p>
+    <div className="min-h-screen bg-gray-50">
+      {/* Clean Header */}
+      <nav className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="container mx-auto flex items-center justify-between max-w-7xl">
+          <div className="flex items-center gap-4">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <BarChart3 size={16} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">Business Dashboard</h1>
+              <p className="text-sm text-gray-600">Monitor your TipVault platform performance</p>
+            </div>
           </div>
           
           <div className="flex items-center gap-4">
             <select 
               value={selectedPeriod}
               onChange={(e) => setSelectedPeriod(e.target.value)}
-              className="bg-white/10 border border-white/20 rounded-lg px-4 py-2 text-white"
+              className="bg-white border border-gray-300 rounded-lg px-4 py-2 text-gray-900"
             >
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
@@ -73,12 +73,16 @@ export default function BusinessDashboard() {
               <option value="1y">Last year</option>
             </select>
             
-            <Button className="bg-white/10 border border-white/20 text-white hover:bg-white/20">
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
               <Download size={16} className="mr-2" />
               Export Data
             </Button>
           </div>
-        </motion.div>
+        </div>
+      </nav>
+
+      <div className="container mx-auto px-6 py-8 max-w-7xl">
+
 
         {/* Key Metrics */}
         <motion.div
@@ -87,59 +91,67 @@ export default function BusinessDashboard() {
           transition={{ delay: 0.1 }}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
         >
-          <GlassCard className="p-6">
+          <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300 mb-1">Total Revenue</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
+                <p className="text-2xl font-bold text-gray-900">
                   ${businessMetrics.totalRevenue.toLocaleString()}
                 </p>
-                <p className="text-xs text-green-400 mt-1">
+                <p className="text-xs text-green-600 mt-1">
                   +{businessMetrics.monthlyGrowth}% from last month
                 </p>
               </div>
-              <DollarSign size={24} className="text-green-400" />
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <DollarSign size={20} className="text-green-600" />
+              </div>
             </div>
-          </GlassCard>
+          </div>
           
-          <GlassCard className="p-6">
+          <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300 mb-1">Active Workers</p>
-                <p className="text-2xl font-bold text-white">{businessMetrics.activeWorkers}</p>
-                <p className="text-xs text-blue-400 mt-1">
+                <p className="text-sm text-gray-600 mb-1">Active Workers</p>
+                <p className="text-2xl font-bold text-gray-900">{businessMetrics.activeWorkers}</p>
+                <p className="text-xs text-blue-600 mt-1">
                   12 new this week
                 </p>
               </div>
-              <Users size={24} className="text-blue-400" />
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users size={20} className="text-blue-600" />
+              </div>
             </div>
-          </GlassCard>
+          </div>
           
-          <GlassCard className="p-6">
+          <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300 mb-1">Avg Tip Increase</p>
-                <p className="text-2xl font-bold text-white">{businessMetrics.avgTipIncrease}%</p>
-                <p className="text-xs text-purple-400 mt-1">
+                <p className="text-sm text-gray-600 mb-1">Avg Tip Increase</p>
+                <p className="text-2xl font-bold text-gray-900">{businessMetrics.avgTipIncrease}%</p>
+                <p className="text-xs text-purple-600 mt-1">
                   vs traditional methods
                 </p>
               </div>
-              <TrendingUp size={24} className="text-purple-400" />
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <TrendingUp size={20} className="text-purple-600" />
+              </div>
             </div>
-          </GlassCard>
+          </div>
           
-          <GlassCard className="p-6">
+          <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-300 mb-1">Platform Fees</p>
-                <p className="text-2xl font-bold text-white">{businessMetrics.platformFee}%</p>
-                <p className="text-xs text-yellow-400 mt-1">
+                <p className="text-sm text-gray-600 mb-1">Processing Fee</p>
+                <p className="text-2xl font-bold text-gray-900">{businessMetrics.platformFee}%</p>
+                <p className="text-xs text-orange-600 mt-1">
                   Industry-leading low rate
                 </p>
               </div>
-              <Target size={24} className="text-yellow-400" />
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <Target size={20} className="text-orange-600" />
+              </div>
             </div>
-          </GlassCard>
+          </div>
         </motion.div>
 
         {/* Main Content */}
@@ -154,24 +166,31 @@ export default function BusinessDashboard() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
             >
-              <GlassCard className="p-6">
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold text-white">Revenue Trends</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Revenue Trends</h3>
                   <div className="flex items-center gap-2">
-                    <BarChart3 size={20} className="text-gray-300" />
-                    <span className="text-sm text-gray-300">Monthly View</span>
+                    <BarChart3 size={20} className="text-gray-500" />
+                    <span className="text-sm text-gray-600">Monthly View</span>
                   </div>
                 </div>
                 
-                {/* Placeholder for revenue chart */}
-                <div className="h-64 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-lg flex items-center justify-center">
-                  <div className="text-center space-y-2">
-                    <TrendingUp size={48} className="text-blue-400 mx-auto" />
-                    <p className="text-white font-medium">Revenue Chart</p>
-                    <p className="text-sm text-gray-300">Integration with Recharts coming soon</p>
+                {/* Clean placeholder for revenue chart */}
+                <div className="h-64 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-center">
+                  <div className="text-center space-y-3">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto">
+                      <TrendingUp size={24} className="text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-gray-900 font-medium">Revenue Analytics</p>
+                      <p className="text-sm text-gray-600">Advanced charts available in Pro</p>
+                    </div>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                      Upgrade for Charts
+                    </Button>
                   </div>
                 </div>
-              </GlassCard>
+              </div>
             </motion.div>
 
             {/* Top Performing Workers */}
@@ -180,30 +199,30 @@ export default function BusinessDashboard() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
             >
-              <GlassCard className="p-6">
-                <h3 className="text-lg font-semibold text-white mb-6">Top Performing Workers</h3>
+              <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-6">Top Performing Workers</h3>
                 
                 <div className="space-y-4">
                   {topWorkers.map((worker, index) => (
-                    <div key={worker.name} className="flex items-center justify-between p-4 bg-white/5 rounded-lg">
+                    <div key={worker.name} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
                       <div className="flex items-center gap-4">
-                        <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                        <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
                           {index + 1}
                         </div>
                         <div>
-                          <p className="font-medium text-white">{worker.name}</p>
-                          <p className="text-sm text-gray-300">{worker.location}</p>
+                          <p className="font-medium text-gray-900">{worker.name}</p>
+                          <p className="text-sm text-gray-600">{worker.location}</p>
                         </div>
                       </div>
                       
                       <div className="text-right">
-                        <p className="font-semibold text-white">${worker.earnings}</p>
-                        <p className="text-sm text-green-400">+{worker.growth}%</p>
+                        <p className="font-semibold text-gray-900">${worker.earnings}</p>
+                        <p className="text-sm text-green-600">+{worker.growth}%</p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </GlassCard>
+              </div>
             </motion.div>
           </div>
 
