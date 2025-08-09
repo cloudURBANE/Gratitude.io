@@ -39,6 +39,7 @@ export default function TipFlow() {
   const [isGameMode, setIsGameMode] = useState(false);
   const gameRef = useRef<HTMLDivElement>(null);
   const [processingComplete, setProcessingComplete] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
 
   // Demo worker data
   const demoWorker: Worker = {
@@ -63,6 +64,55 @@ export default function TipFlow() {
 
   const worker = handle === 'demo' ? demoWorker : workerData;
 
+  // Check for returning user after payment
+  useEffect(() => {
+    const checkPaymentReturn = () => {
+      try {
+        const paymentIntent = localStorage.getItem('tiplink-payment-intent');
+        if (paymentIntent) {
+          const intent = JSON.parse(paymentIntent);
+          const timeSincePayment = Date.now() - intent.timestamp;
+          
+          // If user returns within 10 minutes and hasn't completed flow
+          if (timeSincePayment < 600000 && intent.step === 'redirecting') {
+            // Mark as completed and show review
+            intent.step = 'completed';
+            localStorage.setItem('tiplink-payment-intent', JSON.stringify(intent));
+            
+            setSelectedAmount(intent.amount);
+            setSelectedMethod(intent.method);
+            setCurrentStep("review");
+            
+            toast({
+              title: "Payment Sent!",
+              description: `$${intent.amount} tip sent successfully`,
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to check payment return:', e);
+      }
+    };
+
+    // Check on page load
+    checkPaymentReturn();
+    
+    // Check when page becomes visible (user returns from payment app)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        setTimeout(checkPaymentReturn, 500); // Small delay to ensure state is ready
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, [worker]);
+
   // Auto-advance from amount to payment when amount is selected
   useEffect(() => {
     if (currentStep === "amount" && selectedAmount > 0) {
@@ -84,15 +134,77 @@ export default function TipFlow() {
   }, [isGameMode]);
 
   // Handle payment method selection
-  const handlePaymentSelect = (method: PayMethod) => {
+  const handlePaymentSelect = async (method: PayMethod) => {
     setSelectedMethod(method);
-    setCurrentStep("processing");
+    setRedirecting(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
-      setProcessingComplete(true);
-      setTimeout(() => setCurrentStep("review"), 1000);
-    }, 2200);
+    // Store payment intent for return detection
+    const paymentIntent = {
+      method,
+      amount: selectedAmount,
+      workerHandle: worker.handle,
+      timestamp: Date.now(),
+      step: 'redirecting'
+    };
+    
+    try {
+      localStorage.setItem('tiplink-payment-intent', JSON.stringify(paymentIntent));
+    } catch (e) {
+      console.warn('Failed to store payment intent:', e);
+    }
+
+    // Build payment URL and redirect immediately
+    const payUrl = buildPayUrl(method, selectedAmount, worker);
+    
+    if (method === 'stripe') {
+      // For Stripe, we need to create a checkout session first
+      try {
+        const response = await apiRequest("POST", "/api/create-payment-intent", {
+          amount: selectedAmount,
+          workerId: worker.id,
+          customerName: 'Anonymous'
+        });
+        
+        const data = await response.json();
+        if (data.clientSecret) {
+          // Redirect to Stripe checkout
+          window.location.href = `/checkout?client_secret=${data.clientSecret}&amount=${selectedAmount}&worker=${worker.handle}`;
+          return;
+        }
+      } catch (error) {
+        console.error('Failed to create Stripe payment:', error);
+        toast({
+          title: "Payment Error",
+          description: "Failed to initialize payment. Please try again.",
+          variant: "destructive",
+        });
+        setRedirecting(false);
+        return;
+      }
+    } else {
+      // For other methods, redirect to payment app immediately
+      try {
+        window.location.href = payUrl;
+        
+        // If user returns quickly (app failed to open), show fallback
+        setTimeout(() => {
+          if (!document.hidden) {
+            toast({
+              title: "Open Payment App",
+              description: `Tap to open ${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'}`,
+              action: {
+                label: "Try Again",
+                onClick: () => window.open(payUrl, '_blank')
+              }
+            });
+            setRedirecting(false);
+          }
+        }, 3000);
+      } catch (error) {
+        console.error('Payment redirect failed:', error);
+        setRedirecting(false);
+      }
+    }
   };
 
   // Handle review actions
@@ -114,10 +226,19 @@ export default function TipFlow() {
 
   // Reset flow
   const startOver = () => {
+    // Clear any stored payment intent
+    try {
+      localStorage.removeItem('tiplink-payment-intent');
+    } catch (e) {
+      console.warn('Failed to clear payment intent:', e);
+    }
+    
     setCurrentStep("amount");
     setSelectedAmount(0);
     setSelectedMethod("stripe");
     setProcessingComplete(false);
+    setRedirecting(false);
+    setIsGameMode(false);
   };
 
   if (!worker) {
@@ -262,7 +383,7 @@ export default function TipFlow() {
         )}
 
         {/* Step 2: Payment Method */}
-        {currentStep === "payment" && (
+        {currentStep === "payment" && !redirecting && (
           <motion.div
             key="payment"
             variants={pageVariants}
@@ -297,8 +418,45 @@ export default function TipFlow() {
           </motion.div>
         )}
 
+        {/* Step 2.5: Redirecting to Payment */}
+        {redirecting && (
+          <motion.div
+            key="redirecting"
+            variants={pageVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ 
+              duration: 0.45, 
+              ease: [0.25, 0.1, 0.25, 1],
+              filter: { duration: 0.3 }
+            }}
+            className="min-h-screen flex flex-col justify-center px-4"
+          >
+            <div className="max-w-md mx-auto text-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                className="w-20 h-20 mx-auto mb-6 border-4 border-accent-start border-t-transparent rounded-full"
+              />
+
+              <div className="text-2xl font-bold mb-2">Redirecting to Payment</div>
+              
+              <div className="text-text-secondary mb-4">
+                Opening {selectedMethod === 'stripe' ? 'secure checkout' : 
+                        selectedMethod === 'venmo' ? 'Venmo' :
+                        selectedMethod === 'cashapp' ? 'Cash App' : 'Zelle'}...
+              </div>
+
+              <div className="text-sm text-text-secondary">
+                You'll return here after completing your ${selectedAmount} tip
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* Step 3: Processing */}
-        {currentStep === "processing" && (
+        {currentStep === "processing" && !redirecting && (
           <motion.div
             key="processing"
             variants={pageVariants}
