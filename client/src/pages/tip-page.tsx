@@ -3,12 +3,22 @@ import { useParams, useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  TipMemoryManager, 
+  SmartDefaultsManager, 
+  ReturnFlowManager,
+  parseSmartParams,
+  getWhisperBoostConfig
+} from "@/lib/tip-memory";
 
 import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
 import TipPreset from "@/components/tip-preset";
 import { PaymentMethodWithIcon } from "@/components/payment-app-icons";
 import ThumbDial from "@/components/thumb-dial";
+import OneTapRepeat from "@/components/one-tap-repeat";
+import WhisperBoost from "@/components/whisper-boost";
+import ReturnFlowReviews from "@/components/return-flow-reviews";
 import EnhancedGlassCard from "@/components/enhanced-glass-card";
 import EnhancedPaymentButton from "@/components/enhanced-payment-button";
 import ProfileEditor from "@/components/profile-editor";
@@ -50,6 +60,9 @@ export default function TipPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [showZelleModal, setShowZelleModal] = useState(false);
+  const [showOneTapRepeat, setShowOneTapRepeat] = useState(false);
+  const [showReturnFlowReviews, setShowReturnFlowReviews] = useState(false);
+  const [whisperBoostEnabled, setWhisperBoostEnabled] = useState(false);
 
   // Demo data for when handle is 'demo'
   const demoWorker: Worker = {
@@ -77,12 +90,21 @@ export default function TipPage() {
     enabled: !!handle && handle !== 'demo',
   });
 
+  // Initialize TipLink Express managers
+  const tipMemoryManager = new TipMemoryManager();
+  const smartDefaultsManager = new SmartDefaultsManager();
+  const returnFlowManager = new ReturnFlowManager();
+  const whisperBoostConfig = getWhisperBoostConfig();
+
   const worker = handle === 'demo' ? demoWorker : workerData;
 
-  // Track QR scan when worker data is loaded
+  // TipLink Express initialization
   useEffect(() => {
+    if (!handle) return;
+
     const currentWorker = handle === 'demo' ? demoWorker : workerData;
     if (currentWorker?.id) {
+      // Track QR scan
       const recordScan = async () => {
         try {
           await apiRequest("POST", "/api/qr-scans", {
@@ -94,6 +116,36 @@ export default function TipPage() {
       };
       recordScan();
     }
+
+    // Check for URL parameters (smart defaults)
+    const urlParams = parseSmartParams();
+    if (urlParams.amount && urlParams.amount > 0) {
+      setSelectedAmount(urlParams.amount);
+      setCustomAmount("");
+    }
+    if (urlParams.method) {
+      setSelectedPaymentMethod(urlParams.method);
+    }
+
+    // Check for previous tip memory (One-Tap Repeat)
+    const lastTip = tipMemoryManager.getLastTip(handle);
+    if (lastTip && !urlParams.amount && !urlParams.method) {
+      setShowOneTapRepeat(true);
+    } else if (!lastTip && !urlParams.amount && !urlParams.method) {
+      // Apply smart defaults for new users
+      const smartDefaults = smartDefaultsManager.getSmartDefaults();
+      setSelectedAmount(smartDefaults.amount);
+      setSelectedPaymentMethod(smartDefaults.method);
+    }
+
+    // Set up return flow detection
+    returnFlowManager.onReturn(() => {
+      setShowReturnFlowReviews(true);
+    });
+
+    return () => {
+      returnFlowManager.destroy();
+    };
   }, [handle, workerData]);
 
   const createTipMutation = useMutation({
@@ -145,7 +197,11 @@ export default function TipPage() {
   };
 
   const getCurrentAmount = () => {
-    return selectedAmount || (customAmount ? parseFloat(customAmount) : null);
+    const baseAmount = selectedAmount || (customAmount ? parseFloat(customAmount) : null);
+    if (baseAmount && whisperBoostEnabled) {
+      return baseAmount + whisperBoostConfig.amount;
+    }
+    return baseAmount;
   };
 
   const canSendTip = () => {
@@ -157,6 +213,11 @@ export default function TipPage() {
     if (!canSendTip() || !worker) return;
 
     const amount = getCurrentAmount()!;
+
+    // Save this tip to memory for future One-Tap Repeat
+    if (handle) {
+      tipMemoryManager.saveLastTip(handle, amount, selectedPaymentMethod);
+    }
 
     if (selectedPaymentMethod === 'stripe') {
       // For Stripe, redirect to checkout
@@ -227,6 +288,24 @@ export default function TipPage() {
       </div>
 
       <div className="relative z-10 max-w-md mx-auto px-4 py-8">
+        
+        {/* One-Tap Repeat for returning customers */}
+        {showOneTapRepeat && handle && (
+          <OneTapRepeat
+            memory={tipMemoryManager.getLastTip(handle)!}
+            onRepeat={() => {
+              const memory = tipMemoryManager.getLastTip(handle)!;
+              setSelectedAmount(memory.amount);
+              setSelectedPaymentMethod(memory.method);
+              setShowOneTapRepeat(false);
+              // Auto-proceed with the remembered tip
+              setTimeout(() => handleSendTip(), 100);
+            }}
+            onChangeAmount={() => {
+              setShowOneTapRepeat(false);
+            }}
+          />
+        )}
         {/* Header with worker info */}
         <GlassCard className="rounded-2xl p-6 mb-6 text-center">
           <img 
@@ -264,20 +343,22 @@ export default function TipPage() {
           </GlassCard>
         </div>
 
-        {/* Genius Thumb Dial */}
-        <div className="mb-8">
-          <h3 className="text-lg font-medium text-text-primary mb-6 text-center">
-            Say thanks in 2 taps
-          </h3>
-          <ThumbDial
-            onAmountChange={(amount) => {
-              setSelectedAmount(amount);
-              setCustomAmount("");
-            }}
-            selectedAmount={selectedAmount}
-            customAmount={customAmount}
-          />
-        </div>
+        {/* Genius Thumb Dial - hidden when showing One-Tap Repeat */}
+        {!showOneTapRepeat && (
+          <div className="mb-8">
+            <h3 className="text-lg font-medium text-text-primary mb-6 text-center">
+              Say thanks in 2 taps
+            </h3>
+            <ThumbDial
+              onAmountChange={(amount) => {
+                setSelectedAmount(amount);
+                setCustomAmount("");
+              }}
+              selectedAmount={selectedAmount}
+              customAmount={customAmount}
+            />
+          </div>
+        )}
 
         {/* Payment methods */}
         <div className="mb-6">
@@ -317,6 +398,13 @@ export default function TipPage() {
             )}
           </div>
         </div>
+
+        {/* Whisper Boost - optional $1 add-on */}
+        <WhisperBoost
+          config={whisperBoostConfig}
+          currentAmount={selectedAmount || (customAmount ? parseFloat(customAmount) : 0) || 0}
+          onBoostChange={setWhisperBoostEnabled}
+        />
 
         {/* Optional note */}
         <div className="mb-6">
@@ -461,6 +549,21 @@ export default function TipPage() {
               note: tipNote || `Tip for ${worker.name}`,
             });
             setLocation('/success');
+          }}
+        />
+      )}
+
+      {/* Return Flow Reviews - slide in when user returns from payment app */}
+      {showReturnFlowReviews && worker && (
+        <ReturnFlowReviews
+          worker={worker}
+          onClose={() => setShowReturnFlowReviews(false)}
+          onReviewClick={(type) => {
+            const url = type === 'google' ? worker.googleReviewUrl : worker.yelpReviewUrl;
+            if (url) {
+              window.open(url, '_blank');
+              setShowReturnFlowReviews(false);
+            }
           }}
         />
       )}

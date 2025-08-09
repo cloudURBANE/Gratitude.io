@@ -1,0 +1,103 @@
+Love this pivot. Here’s a genius, low-friction system that keeps tips flowing without the worker doing the same dance every time.
+
+TipLink Express (set-and-forget flow)
+
+1) One-Tap Repeat (remembers the customer)
+
+Idea: If a customer has tipped you before on that device, show a giant “Tip again: $X” button as the very first thing (plus a tiny “change amount” link).
+Why it works: repeat behavior > persuasion. It’s familiar, fast, and respectful.
+
+How to implement
+	•	On first tip, store {amount, method} in localStorage.
+	•	On load, if found, render One-Tap Repeat at the top and auto-prime the correct deep link.
+
+// pseudo in /u/[handle]
+const k = `tiplink:${handle}:last`;
+const last = JSON.parse(localStorage.getItem(k) || "null"); // {amount: 10, method: "cashapp"}
+if (last) showRepeat(last);
+function saveLast(a:number,m:string){ localStorage.setItem(k, JSON.stringify({amount:a, method:m})) }
+
+2) Smart Default (context-aware)
+
+Idea: If it’s their first time, don’t show random presets. Use a smart default tuned by context:
+	•	$5 weekday mornings, $7 Fri/Sat nights.
+	•	If the bill/note amount is known (e.g., you typed it in), set 15–20%.
+	•	If the device is iOS and Apple Pay is available, show Card/Apple Pay first; Android → Cash App first.
+
+How to implement
+	•	Lightweight rules engine: (day, hour, device, venueType?) → defaultAmount + primaryMethod.
+	•	Preselect the dial to that amount and highlight the best method button.
+
+3) NFC Tap Card (no camera, no QR)
+
+Idea: Worker carries a tiny NFC card (credit-card or keyfob). Customer taps → phone opens your deep link with amount prefilled (e.g., cash.app/$rack/7 or Venmo universal URL).
+Why it works: zero camera friction; magical feeling; perfect for repeat interactions.
+
+How to implement
+	•	Encode a short link like https://t.lnk/rack?a=7&m=cashapp.
+	•	Your page instantly redirects to the native app deep link; if blocked (in-app browser), show “Open in Safari/Chrome” + QR fallback.
+
+4) Shift QR (ephemeral, auto-rotating)
+
+Idea: Each shift generates a fresh QR with a lightweight token (valid for, say, 8 hours). That token remembers the worker’s preferred method for that shift and the most effective default amount from past data.
+
+Why it works: keeps analytics clean, resists old screenshots, and lets the system continuously self-optimize defaults without the worker doing anything.
+
+How to implement
+	•	/u/[handle]?t=<shiftToken> → server (or edge function) looks up {primaryMethod, defaultAmount}.
+	•	Store conversions against shiftToken for learning; next shift’s defaults adapt.
+
+5) Whisper Boost (polite, non-pushy nudge)
+
+Idea: After they pick an amount, show a tiny “+ $1 keeps this worker ad-free” toggle (off by default). It’s respectful, visible, and not spammy.
+
+How to implement
+	•	One checkbox before opening the deep link. If on, bump the amount client-side before building the URL.
+
+6) Wallet Pass (loyalty without accounts)
+
+Idea: On success page, offer “Add TipLink to Wallet” (Apple/Google). The pass shows your avatar + a dynamic QR. Next time they open it from Wallet at your venue, tapping the QR jumps straight to One-Tap Repeat.
+
+Why it works: zero login, zero app install; turns occasional tippers into regulars.
+
+How to implement
+	•	Generate an Apple Wallet .pkpass and a Google Wallet pass with your short link. Update the pass background seasonally; keep the QR static to your short link.
+
+7) Return-Flow Reviews (only when they come back)
+
+Idea: Detect when the user returns from Venmo/Cash App (page becomes visible again) and slide in two chips: “⭐️ Google” and “Yelp”. No reviews nag before they tip.
+
+How to implement
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') showReviewChips();
+});
+
+8) Team-Split (optional, 1 extra tap)
+
+Idea: If the service was shared (barback + bartender), show “Split with team (50/50)” right under the amount. Selecting it reveals second person’s handle and builds two deep links—the UI opens the first, then shows a “Now tip 2/2” bar.
+
+Why it works: customers often want to be fair; this makes it effortless.
+
+⸻
+
+How this stays “non-repetitive” for the worker
+	•	Autopilot defaults: Shift QR + Smart Default means they never juggle amounts or methods.
+	•	One-Tap Repeat handles regulars automatically.
+	•	NFC tap handles folks who don’t like QR.
+	•	Wallet pass handles long-term loyalty without DMs or accounts.
+
+⸻
+
+Minimal changes to your current scaffold
+	•	Add ?a=<amt>&m=<method> support to /u/[handle] (auto-select dial + button).
+	•	Implement One-Tap Repeat block when a saved {amount, method} exists.
+	•	Add a /t/<token> short route that resolves to /u/[handle]?a=…&m=….
+	•	Add the visibility return detector for reviews.
+	•	Optional: create a tiny NFC/QR generator page to print shift cards.
+
+If you want, I’ll wire these into your project so you can demo:
+	•	One-Tap Repeat
+	•	Smart defaults by time/device
+	•	Redirect handler for NFC short links
+	•	Return-flow review slide-in
