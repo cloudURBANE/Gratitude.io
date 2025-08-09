@@ -71,6 +71,19 @@ export default function TipFlow() {
 
   const worker = handle === 'demo' ? demoWorker : workerData;
 
+  // Handle snake game food eaten
+  const handleSnakeFoodEaten = (amount: number) => {
+    setSelectedAmount(prev => prev + amount);
+  };
+
+  // Handle snake game completion
+  const handleSnakeGameComplete = (totalTips: number) => {
+    if (totalTips > 0) {
+      setSelectedAmount(totalTips);
+      setCurrentStep("payment");
+    }
+  };
+
   // Check for returning user after payment
   useEffect(() => {
     const checkPaymentReturn = () => {
@@ -485,16 +498,21 @@ export default function TipFlow() {
                 {/* Amount input methods */}
                 {!isGameMode ? (
                   <QuickTip
-                    onAmountSelect={setSelectedAmount}
-                    selectedAmount={selectedAmount}
+                    onAmountSelected={setSelectedAmount}
                   />
                 ) : (
-                  <div ref={gameRef}>
+                  <motion.div
+                    ref={gameRef}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ duration: 0.3 }}
+                  >
                     <SnakeGame
-                      worker={worker}
-                      onTipEarned={(amount) => setSelectedAmount(amount)}
+                      onFoodEaten={handleSnakeFoodEaten}
+                      onGameComplete={handleSnakeGameComplete}
                     />
-                  </div>
+                  </motion.div>
                 )}
 
                 {/* Continue hint */}
