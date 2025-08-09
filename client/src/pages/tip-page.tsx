@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
 import TipPreset from "@/components/tip-preset";
-import PaymentMethod from "@/components/payment-method";
+import { PaymentMethodWithIcon } from "@/components/payment-app-icons";
 import ProfileEditor from "@/components/profile-editor";
 import PaymentModal from "@/components/payment-modal";
 import ReviewPrompt from "@/components/review-prompt";
@@ -21,7 +21,7 @@ interface Worker {
   avatarUrl?: string;
   venmoHandle?: string;
   cashappHandle?: string;
-  zelleInfo?: string;
+  zelleHandle?: string;
   stripeAccountId?: string;
   googleReviewUrl?: string;
   yelpReviewUrl?: string;
@@ -297,48 +297,39 @@ export default function TipPage() {
         {/* Payment methods */}
         <div className="mb-6">
           <h3 className="text-lg font-medium text-text-primary mb-4">Choose payment method</h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
+            <PaymentMethodWithIcon
+              method="stripe"
+              isSelected={selectedPaymentMethod === 'stripe'}
+              onClick={() => handlePaymentMethodSelect('stripe')}
+            />
+            
             {worker.venmoHandle && (
-              <PaymentMethod
+              <PaymentMethodWithIcon
                 method="venmo"
-                title="Venmo"
-                subtitle={`@${worker.venmoHandle}`}
-                icon="venmo"
+                handle={worker.venmoHandle}
                 isSelected={selectedPaymentMethod === 'venmo'}
-                onSelect={() => handlePaymentMethodSelect('venmo')}
+                onClick={() => handlePaymentMethodSelect('venmo')}
               />
             )}
 
             {worker.cashappHandle && (
-              <PaymentMethod
+              <PaymentMethodWithIcon
                 method="cashapp"
-                title="Cash App"
-                subtitle={`$${worker.cashappHandle}`}
-                icon="cashapp"
+                handle={worker.cashappHandle}
                 isSelected={selectedPaymentMethod === 'cashapp'}
-                onSelect={() => handlePaymentMethodSelect('cashapp')}
+                onClick={() => handlePaymentMethodSelect('cashapp')}
               />
             )}
 
-            {worker.zelleInfo && (
-              <PaymentMethod
+            {worker.zelleHandle && (
+              <PaymentMethodWithIcon
                 method="zelle"
-                title="Zelle"
-                subtitle={worker.zelleInfo}
-                icon="zelle"
+                handle={worker.zelleHandle}
                 isSelected={selectedPaymentMethod === 'zelle'}
-                onSelect={() => handlePaymentMethodSelect('zelle')}
+                onClick={() => handlePaymentMethodSelect('zelle')}
               />
             )}
-
-            <PaymentMethod
-              method="stripe"
-              title="Card"
-              subtitle="Instant payment"
-              icon="card"
-              isSelected={selectedPaymentMethod === 'stripe'}
-              onSelect={() => handlePaymentMethodSelect('stripe')}
-            />
           </div>
         </div>
 

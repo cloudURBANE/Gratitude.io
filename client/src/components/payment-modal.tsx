@@ -145,10 +145,15 @@ export default function PaymentModal({
         </div>
 
         <div className="bg-glass rounded-lg p-4 mb-6">
-          <div className="text-center">
-            <div className="text-text-secondary text-sm mb-1">Send to:</div>
-            <div className="text-text-primary font-semibold text-lg">
-              {getHandle() || 'Handle not set'}
+          <div className="flex items-center justify-center space-x-3">
+            {paymentMethod === 'venmo' && <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold text-sm">V</div>}
+            {paymentMethod === 'cashapp' && <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center text-white font-bold text-sm">$</div>}
+            {paymentMethod === 'zelle' && <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm">Z</div>}
+            <div className="text-center">
+              <div className="text-text-secondary text-sm mb-1">Send to:</div>
+              <div className="text-text-primary font-semibold text-lg">
+                {getHandle() || 'Handle not set'}
+              </div>
             </div>
           </div>
         </div>

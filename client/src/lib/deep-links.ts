@@ -8,23 +8,25 @@ interface PaymentAppLinks {
 
 export const paymentAppLinks: PaymentAppLinks = {
   venmo: (handle: string, amount: number, note: string) => ({
-    deepLink: `venmo://paycharge?txn=pay&recipients=${handle}&amount=${amount}&note=${encodeURIComponent(note)}`,
+    deepLink: `venmo://paycharge?txn=pay&recipients=${handle.replace('@', '')}&amount=${amount}&note=${encodeURIComponent(note)}`,
     webFallback: `https://venmo.com/${handle.replace('@', '')}`
   }),
   
   cashapp: (handle: string, amount: number) => ({
-    deepLink: `cashapp://pay/${handle.replace('$', '')}?amount=${amount}`,
+    deepLink: `cashapp://pay/${handle.replace('$', '')}/${amount}`,
     webFallback: `https://cash.app/$${handle.replace('$', '')}/${amount}`
   }),
   
   zelle: (handle: string, amount: number, note: string) => ({
     deepLinks: [
       `zelle://send?recipient=${handle}&amount=${amount}&note=${encodeURIComponent(note)}`,
+      `com.zellepay.zelle://send?to=${handle}&amount=${amount}`,
       `bankofamerica://zelle/send?recipient=${handle}&amount=${amount}`,
       `wellsfargo://zelle/send?recipient=${handle}&amount=${amount}`,
-      `chase://pay/zelle?recipient=${handle}&amount=${amount}`,
+      `chase://zelle/send?recipient=${handle}&amount=${amount}`,
       `usbank://zelle/send?recipient=${handle}&amount=${amount}`,
-      `pnc://zelle/send?recipient=${handle}&amount=${amount}`
+      `pncbank://zelle/send?recipient=${handle}&amount=${amount}`,
+      `capitalone://zelle/send?recipient=${handle}&amount=${amount}`
     ],
     fallback: `Manual Zelle transfer to ${handle} for $${amount}`
   })
@@ -86,28 +88,66 @@ export const openPaymentApp = async (
   }
 };
 
-// Helper function to attempt deep link opening
+// Helper function to attempt deep link opening with multiple strategies
 const attemptDeepLink = async (url: string): Promise<boolean> => {
   return new Promise((resolve) => {
     try {
-      // Method 1: Hidden link click
+      // Method 1: Direct window location change (most reliable on mobile)
+      const startTime = Date.now();
+      
+      // Set up visibility change listener to detect if app opened
+      const handleVisibilityChange = () => {
+        if (document.hidden || Date.now() - startTime > 500) {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+          resolve(true);
+        }
+      };
+      
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Method 2: Create invisible iframe (works on iOS)
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.src = url;
+      document.body.appendChild(iframe);
+      
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+      
+      // Method 3: Hidden link with click event
       const link = document.createElement('a');
       link.href = url;
       link.style.display = 'none';
       document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
       
-      // Method 2: Try window.location as backup
+      // Trigger click programmatically
+      const clickEvent = new MouseEvent('click', {
+        view: window,
+        bubbles: true,
+        cancelable: true
+      });
+      link.dispatchEvent(clickEvent);
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+      }, 500);
+      
+      // Method 4: Try window.location as final attempt
       setTimeout(() => {
         try {
           window.location.href = url;
         } catch (e) {
           console.log('Window.location method failed:', e);
         }
-      }, 500);
+      }, 100);
       
-      resolve(true);
+      // Clean up listener after timeout
+      setTimeout(() => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        resolve(false);
+      }, 3000);
+      
     } catch (error) {
       console.log('Deep link attempt failed:', error);
       resolve(false);
