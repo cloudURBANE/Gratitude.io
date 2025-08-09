@@ -59,8 +59,32 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
   const step = useCallback(() => {
     setSnake(prevSnake => {
       const head = prevSnake[0];
-      const newX = (head.x + (dir === "right" ? 1 : dir === "left" ? -1 : 0) + COLS) % COLS;
-      const newY = (head.y + (dir === "down" ? 1 : dir === "up" ? -1 : 0) + ROWS) % ROWS;
+      let newX = head.x;
+      let newY = head.y;
+
+      // Update position based on direction
+      switch (dir) {
+        case "right":
+          newX = head.x + 1;
+          break;
+        case "left":
+          newX = head.x - 1;
+          break;
+        case "down":
+          newY = head.y + 1;
+          break;
+        case "up":
+          newY = head.y - 1;
+          break;
+      }
+
+      // Check boundary collision (game ends when hitting walls)
+      if (newX < 0 || newX >= COLS || newY < 0 || newY >= ROWS) {
+        setAlive(false);
+        setPaused(true);
+        return prevSnake;
+      }
+
       const newHead = { x: newX, y: newY };
 
       // Check self collision

@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import GlassCard from "@/components/glass-card";
-import HoldToTip from "@/components/hold-to-tip";
+import QuickTip from "@/components/quick-tip";
 import SmartDock from "@/components/smart-dock";
 import SnakeGame from "@/components/snake-game";
 import { buildPayUrl, defaultPayMethod, type PayMethod } from "@/lib/snake-pay";
@@ -178,7 +178,7 @@ export default function TipFlow() {
                           : 'text-text-secondary hover:text-text-primary'
                       }`}
                     >
-                      Hold to Tip
+                      Quick Tip
                     </button>
                     <button
                       onClick={() => setIsGameMode(true)}
@@ -195,8 +195,8 @@ export default function TipFlow() {
 
                 {/* Amount input methods */}
                 {!isGameMode ? (
-                  <HoldToTip
-                    onAmountChange={setSelectedAmount}
+                  <QuickTip
+                    onAmountSelect={setSelectedAmount}
                     selectedAmount={selectedAmount}
                   />
                 ) : (
