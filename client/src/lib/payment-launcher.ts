@@ -1,294 +1,236 @@
-// Comprehensive failproof payment app launching with multiple fallback methods
+// Enhanced payment launcher with fail-proof app linking
+export type PaymentMethod = "venmo" | "cashapp" | "zelle" | "stripe";
 
 interface PaymentLaunchOptions {
-  method: 'venmo' | 'cashapp' | 'zelle';
+  method: PaymentMethod;
   amount: number;
-  handle?: string;
-  email?: string;
-  workerName?: string;
-  onStatusUpdate?: (status: string) => void;
-  onFallback?: (fallbackUrl: string) => void;
+  worker: any;
+  onFallback?: () => void;
+  onSuccess?: () => void;
 }
 
 export class PaymentLauncher {
-  private static instance: PaymentLauncher;
-  private attempts: Map<string, number> = new Map();
-  
-  static getInstance(): PaymentLauncher {
-    if (!PaymentLauncher.instance) {
-      PaymentLauncher.instance = new PaymentLauncher();
-    }
-    return PaymentLauncher.instance;
-  }
+  private static visibilityCheckTimeout: NodeJS.Timeout | null = null;
 
-  async launchPaymentApp(options: PaymentLaunchOptions): Promise<boolean> {
-    const { method, amount, handle, email, workerName, onStatusUpdate, onFallback } = options;
-    const attemptKey = `${method}-${amount}-${handle}`;
-    const currentAttempts = this.attempts.get(attemptKey) || 0;
+  static async launch({ method, amount, worker, onFallback, onSuccess }: PaymentLaunchOptions) {
+    const formattedAmount = Math.max(0, Number(amount || 0)).toFixed(2);
     
-    if (currentAttempts >= 3) {
-      onStatusUpdate?.('Maximum attempts reached');
-      return false;
-    }
-    
-    this.attempts.set(attemptKey, currentAttempts + 1);
-    
-    onStatusUpdate?.(`Opening ${method}... (Attempt ${currentAttempts + 1})`);
-    
-    switch (method) {
-      case 'venmo':
-        return await this.launchVenmo(amount, handle, workerName, onStatusUpdate, onFallback);
-      case 'cashapp':
-        return await this.launchCashApp(amount, handle, onStatusUpdate, onFallback);
-      case 'zelle':
-        return await this.launchZelle(amount, handle || email, workerName, onStatusUpdate, onFallback);
-      default:
-        return false;
+    // Store payment attempt for return detection
+    const paymentIntent = {
+      method,
+      amount: formattedAmount,
+      worker: worker?.handle || 'demo',
+      timestamp: Date.now(),
+      step: 'redirecting'
+    };
+    localStorage.setItem('tiplink-payment-intent', JSON.stringify(paymentIntent));
+
+    try {
+      if (method === 'venmo') {
+        await this.launchVenmo(formattedAmount, worker, onFallback, onSuccess);
+      } else if (method === 'cashapp') {
+        await this.launchCashApp(formattedAmount, worker, onFallback, onSuccess);
+      } else if (method === 'zelle') {
+        await this.launchZelle(formattedAmount, worker, onFallback, onSuccess);
+      } else {
+        // Stripe fallback
+        window.location.href = `/u/${worker?.handle || 'demo'}/checkout?amount=${formattedAmount}`;
+        onSuccess?.();
+      }
+    } catch (error) {
+      console.warn('Payment launch failed:', error);
+      onFallback?.();
     }
   }
 
-  private async launchVenmo(
-    amount: number, 
-    handle?: string, 
-    workerName?: string,
-    onStatusUpdate?: (status: string) => void,
-    onFallback?: (url: string) => void
-  ): Promise<boolean> {
-    const note = workerName ? `Tip for ${workerName}` : 'Tip for great service!';
-    
-    if (!handle) {
-      const fallbackUrl = `https://venmo.com/?amount=${amount}`;
-      onFallback?.(fallbackUrl);
-      return false;
+  private static async launchVenmo(amount: string, worker: any, onFallback?: () => void, onSuccess?: () => void) {
+    if (!worker?.venmoHandle) {
+      this.fallbackToWebsite('venmo', amount);
+      onFallback?.();
+      return;
     }
 
-    const cleanHandle = handle.replace('@', '');
+    const handle = worker.venmoHandle.replace(/^@/, '');
+    const note = encodeURIComponent(`Tip for ${worker.name || 'great service'}`);
     
-    // Method 1: Native Venmo deep link
-    const deepLink = `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(cleanHandle)}&amount=${amount}&note=${encodeURIComponent(note)}`;
-    
-    if (await this.tryDeepLink(deepLink, 'Venmo app', onStatusUpdate)) {
-      return true;
-    }
-
-    // Method 2: Universal link for iOS
-    const universalLink = `https://venmo.com/u/${encodeURIComponent(cleanHandle)}?amount=${amount}&note=${encodeURIComponent(note)}`;
-    
-    if (await this.tryWebLink(universalLink, 'Venmo web', onStatusUpdate)) {
-      onFallback?.(universalLink);
-      return true;
-    }
-
-    // Method 3: QR code approach
-    const qrLink = `https://venmo.com/qr?user=${encodeURIComponent(cleanHandle)}&amount=${amount}`;
-    onFallback?.(qrLink);
-    return false;
-  }
-
-  private async launchCashApp(
-    amount: number, 
-    handle?: string,
-    onStatusUpdate?: (status: string) => void,
-    onFallback?: (url: string) => void
-  ): Promise<boolean> {
-    if (!handle) {
-      const fallbackUrl = 'https://cash.app/';
-      onFallback?.(fallbackUrl);
-      return false;
-    }
-
-    const cleanHandle = handle.replace('$', '');
-    
-    // Method 1: Cash App universal link (most reliable)
-    const universalLink = `https://cash.app/$${encodeURIComponent(cleanHandle)}/${amount}`;
-    
-    if (await this.tryWebLink(universalLink, 'Cash App', onStatusUpdate)) {
-      return true;
-    }
-
-    // Method 2: Try deep link scheme
-    const deepLink = `cashapp://qr/${encodeURIComponent(cleanHandle)}?amount=${amount}`;
-    
-    if (await this.tryDeepLink(deepLink, 'Cash App deep link', onStatusUpdate)) {
-      return true;
-    }
-
-    // Method 3: Web fallback
-    const webFallback = `https://cash.app/$${encodeURIComponent(cleanHandle)}`;
-    onFallback?.(webFallback);
-    return false;
-  }
-
-  private async launchZelle(
-    amount: number, 
-    recipient?: string, 
-    workerName?: string,
-    onStatusUpdate?: (status: string) => void,
-    onFallback?: (url: string) => void
-  ): Promise<boolean> {
-    if (!recipient) {
-      onStatusUpdate?.('No Zelle information available');
-      return false;
-    }
-
-    const note = workerName ? `Tip for ${workerName}` : 'Tip';
-    
-    // Method 1: Try Zelle deep link
-    const deepLink = `zelle://transfer?recipient=${encodeURIComponent(recipient)}&amount=${amount}&memo=${encodeURIComponent(note)}`;
-    
-    if (await this.tryDeepLink(deepLink, 'Zelle app', onStatusUpdate)) {
-      return true;
-    }
-
-    // Method 2: Bank app deep links (try popular banks)
-    const bankApps = [
-      { scheme: 'com.bankofamerica.BMBMobile', name: 'Bank of America' },
-      { scheme: 'com.chase.sig.android', name: 'Chase' },
-      { scheme: 'com.wellsfargo.mobile.android.wellsfargomobile', name: 'Wells Fargo' },
-      { scheme: 'com.usbank.mobilebanking', name: 'US Bank' }
+    // Try multiple Venmo schemes in order of likelihood to work
+    const venmoUrls = [
+      `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(handle)}&amount=${amount}&note=${note}`,
+      `venmo://payment?recipients=${encodeURIComponent(handle)}&amount=${amount}&note=${note}`,
+      `https://venmo.com/${encodeURIComponent(handle)}?amount=${amount}&note=${note}`,
+      `https://account.venmo.com/u/${encodeURIComponent(handle)}?amount=${amount}`,
     ];
 
-    for (const bank of bankApps) {
-      const bankLink = `${bank.scheme}://zelle?recipient=${encodeURIComponent(recipient)}&amount=${amount}`;
-      if (await this.tryDeepLink(bankLink, bank.name, onStatusUpdate)) {
-        return true;
+    for (let i = 0; i < venmoUrls.length; i++) {
+      const success = await this.attemptAppLaunch(venmoUrls[i], 3000);
+      if (success) {
+        onSuccess?.();
+        return;
+      }
+      
+      // If deep link failed, try web version
+      if (i === 0) {
+        continue;
       }
     }
-
-    // Method 3: Web fallback
-    onStatusUpdate?.('Please use your banking app to send via Zelle');
-    onFallback?.(`Send $${amount} to ${recipient} using Zelle`);
-    return false;
+    
+    // All attempts failed, fallback
+    this.fallbackToWebsite('venmo', amount);
+    onFallback?.();
   }
 
-  private async tryDeepLink(url: string, appName: string, onStatusUpdate?: (status: string) => void): Promise<boolean> {
+  private static async launchCashApp(amount: string, worker: any, onFallback?: () => void, onSuccess?: () => void) {
+    if (!worker?.cashappHandle) {
+      this.fallbackToWebsite('cashapp', amount);
+      onFallback?.();
+      return;
+    }
+
+    const handle = worker.cashappHandle.replace(/^\$/, '');
+    const cashAppUrl = `https://cash.app/$${encodeURIComponent(handle)}/${amount}`;
+    
+    const success = await this.attemptAppLaunch(cashAppUrl, 3000);
+    if (success) {
+      onSuccess?.();
+    } else {
+      this.fallbackToWebsite('cashapp', amount);
+      onFallback?.();
+    }
+  }
+
+  private static async launchZelle(amount: string, worker: any, onFallback?: () => void, onSuccess?: () => void) {
+    const recipient = worker?.zelleHandle || worker?.zelleEmail;
+    if (!recipient) {
+      this.fallbackToWebsite('zelle', amount);
+      onFallback?.();
+      return;
+    }
+
+    const note = encodeURIComponent(`Tip for ${worker.name || 'service'}`);
+    const zelleUrls = [
+      `zelle://payment?amount=${amount}&recipient=${encodeURIComponent(recipient)}&memo=${note}`,
+      `https://www.zellepay.com/send-money?amount=${amount}&recipient=${encodeURIComponent(recipient)}`,
+    ];
+
+    for (const url of zelleUrls) {
+      const success = await this.attemptAppLaunch(url, 3000);
+      if (success) {
+        onSuccess?.();
+        return;
+      }
+    }
+    
+    this.fallbackToWebsite('zelle', amount);
+    onFallback?.();
+  }
+
+  private static async attemptAppLaunch(url: string, timeout: number = 3000): Promise<boolean> {
     return new Promise((resolve) => {
-      onStatusUpdate?.(`Trying ${appName}...`);
+      let launched = false;
       
-      let hasReturned = false;
-      const startTime = Date.now();
-      
-      // Method 1: Visibility change detection
+      // Track visibility changes to detect app launch
       const handleVisibilityChange = () => {
-        if (document.hidden && Date.now() - startTime > 100) {
-          hasReturned = true;
-          cleanup();
+        if (document.hidden && !launched) {
+          launched = true;
           resolve(true);
+          cleanup();
         }
       };
-      
-      // Method 2: Blur detection
+
+      // Track focus loss (another indicator of app launch)
       const handleBlur = () => {
-        if (Date.now() - startTime > 100) {
-          hasReturned = true;
-          cleanup();
+        if (!launched) {
+          launched = true;
           resolve(true);
+          cleanup();
         }
       };
 
       const cleanup = () => {
         document.removeEventListener('visibilitychange', handleVisibilityChange);
         window.removeEventListener('blur', handleBlur);
+        if (this.visibilityCheckTimeout) {
+          clearTimeout(this.visibilityCheckTimeout);
+          this.visibilityCheckTimeout = null;
+        }
       };
-      
+
+      // Set up listeners
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('blur', handleBlur);
-      
-      // Try multiple methods simultaneously
-      try {
-        // Method A: Direct location change
-        window.location.href = url;
-        
-        // Method B: Hidden iframe (iOS compatibility)
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none';
-        iframe.src = url;
-        document.body.appendChild(iframe);
-        
-        setTimeout(() => {
-          try {
-            document.body.removeChild(iframe);
-          } catch (e) {}
-        }, 1000);
-        
-        // Method C: Hidden link click
-        const link = document.createElement('a');
-        link.href = url;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        
-        setTimeout(() => {
-          try {
-            document.body.removeChild(link);
-          } catch (e) {}
-        }, 500);
-        
-      } catch (error) {
-        console.log('Deep link attempt failed:', error);
-      }
-      
-      // Timeout after 2 seconds
-      setTimeout(() => {
-        if (!hasReturned) {
-          cleanup();
-          resolve(false);
-        }
-      }, 2000);
-    });
-  }
 
-  private async tryWebLink(url: string, linkName: string, onStatusUpdate?: (status: string) => void): Promise<boolean> {
-    return new Promise((resolve) => {
-      onStatusUpdate?.(`Opening ${linkName}...`);
-      
+      // Launch the app
       try {
-        // Open in new tab/window
-        const popup = window.open(url, '_blank', 'noopener,noreferrer');
-        
-        if (popup) {
-          // Check if popup was blocked
-          setTimeout(() => {
-            try {
-              if (popup.closed) {
-                resolve(true);
-              } else {
-                popup.focus();
-                resolve(true);
-              }
-            } catch (e) {
-              resolve(true);
-            }
-          }, 100);
-        } else {
-          // Popup blocked, try direct navigation
+        if (url.startsWith('http')) {
           window.location.href = url;
-          resolve(true);
+        } else {
+          // For deep links, try iframe method first, then direct location
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = url;
+          document.body.appendChild(iframe);
+          
+          // Fallback to direct location change
+          setTimeout(() => {
+            if (!launched) {
+              window.location.href = url;
+            }
+          }, 500);
+          
+          // Clean up iframe
+          setTimeout(() => {
+            if (document.body.contains(iframe)) {
+              document.body.removeChild(iframe);
+            }
+          }, 2000);
         }
-      } catch (error) {
-        resolve(false);
+      } catch (e) {
+        console.warn('App launch attempt failed:', e);
       }
+
+      // Timeout fallback
+      this.visibilityCheckTimeout = setTimeout(() => {
+        if (!launched) {
+          resolve(false);
+          cleanup();
+        }
+      }, timeout);
     });
   }
 
-  // Clear attempt history
-  clearAttempts(): void {
-    this.attempts.clear();
+  private static fallbackToWebsite(method: PaymentMethod, amount: string) {
+    const fallbackUrls = {
+      venmo: `https://venmo.com/signup?amount=${amount}`,
+      cashapp: `https://cash.app/app/SWTMSBR`,
+      zelle: `https://www.zellepay.com/get-started`,
+      stripe: `/checkout?amount=${amount}`
+    };
+    
+    window.location.href = fallbackUrls[method];
   }
-  
-  // Get device info for better app detection
-  getDeviceInfo(): { platform: string; hasApps: string[] } {
-    const ua = navigator.userAgent.toLowerCase();
-    const platform = ua.includes('iphone') || ua.includes('ipad') ? 'ios' : 
-                    ua.includes('android') ? 'android' : 'web';
-    
-    // This is a basic detection - in production you might use more sophisticated methods
-    const likelyApps = [];
-    if (platform === 'ios' || platform === 'android') {
-      likelyApps.push('venmo', 'cashapp');
+
+  // Check if user returned from payment app
+  static checkPaymentReturn(worker: any, onReturn: (amount: string, method: PaymentMethod) => void) {
+    try {
+      const paymentIntent = localStorage.getItem('tiplink-payment-intent');
+      if (paymentIntent) {
+        const intent = JSON.parse(paymentIntent);
+        const timeSincePayment = Date.now() - intent.timestamp;
+        
+        // If user returns within 10 minutes and payment is for current worker
+        if (timeSincePayment < 600000 && intent.step === 'redirecting' && 
+            intent.worker === (worker?.handle || 'demo')) {
+          
+          // Mark as completed
+          intent.step = 'completed';
+          localStorage.setItem('tiplink-payment-intent', JSON.stringify(intent));
+          
+          onReturn(intent.amount, intent.method);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to check payment return:', e);
     }
-    
-    return { platform, hasApps: likelyApps };
   }
 }
 

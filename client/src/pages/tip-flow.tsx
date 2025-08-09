@@ -7,7 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import GlassCard from "@/components/glass-card";
 import QuickTip from "@/components/quick-tip";
 import PaymentDock from "@/components/payment-dock";
-import SnakeGame from "@/components/snake-game";
+import SnakeGameRedesigned from "@/components/snake-game-redesigned";
 import { buildPayUrl, defaultPayMethod, type PayMethod } from "@/lib/snake-pay";
 import PaymentLauncher from "@/lib/payment-launcher";
 import PaymentVerificationManager from "@/lib/payment-verification";
@@ -120,12 +120,33 @@ export default function TipFlow() {
     };
   }, [worker]);
 
+  // Handle game completion with payment funneling
+  const handleGameComplete = (score: number, suggestedTip: number) => {
+    setSelectedAmount(suggestedTip);
+    setIsGameMode(false);
+    setCurrentStep("payment");
+    
+    // Store game achievement for potential future use
+    const gameData = {
+      score,
+      suggestedTip,
+      timestamp: Date.now(),
+      worker: worker?.handle || 'demo'
+    };
+    localStorage.setItem('snake-game-achievement', JSON.stringify(gameData));
+    
+    toast({
+      title: `Amazing! Score: ${score}`,
+      description: `Unlocked $${suggestedTip} tip bonus for great gameplay!`,
+    });
+  };
+
   // Auto-advance from amount to payment when amount is selected
   useEffect(() => {
-    if (currentStep === "amount" && selectedAmount > 0) {
+    if (currentStep === "amount" && selectedAmount > 0 && !isGameMode) {
       setTimeout(() => setCurrentStep("payment"), 800);
     }
-  }, [selectedAmount, currentStep]);
+  }, [selectedAmount, currentStep, isGameMode]);
 
   // Smooth scroll to game when switching modes
   useEffect(() => {
@@ -490,9 +511,9 @@ export default function TipFlow() {
                   />
                 ) : (
                   <div ref={gameRef}>
-                    <SnakeGame
-                      worker={worker}
-                      onTipEarned={(amount) => setSelectedAmount(amount)}
+                    <SnakeGameRedesigned
+                      onGameComplete={handleGameComplete}
+                      workerName={worker?.name || "your server"}
                     />
                   </div>
                 )}

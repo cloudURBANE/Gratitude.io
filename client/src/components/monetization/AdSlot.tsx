@@ -4,7 +4,7 @@ import { X, ExternalLink } from "lucide-react";
 import GlassCard from "@/components/glass-card";
 
 interface AdSlotProps {
-  slot: "return" | "dashboard_side" | "tip_page_footer";
+  placement: "return" | "dashboard_side" | "tip_page_footer";
   className?: string;
   onImpressionTracked?: (adId: string) => void;
   onAdClicked?: (adId: string) => void;
@@ -38,11 +38,11 @@ const adData = {
   }
 };
 
-export default function AdSlot({ slot, className, onImpressionTracked, onAdClicked }: AdSlotProps) {
+export function AdSlot({ placement, className, onImpressionTracked, onAdClicked }: AdSlotProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [hasTrackedImpression, setHasTrackedImpression] = useState(false);
 
-  const ad = adData[slot];
+  const ad = adData[placement];
 
   useEffect(() => {
     if (!hasTrackedImpression && onImpressionTracked) {
@@ -114,3 +114,5 @@ export default function AdSlot({ slot, className, onImpressionTracked, onAdClick
     </AnimatePresence>
   );
 }
+
+export default AdSlot;
