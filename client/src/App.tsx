@@ -6,7 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
 
 import Home from "@/pages/home";
-import TipPage from "@/pages/tip-page";
+import TipFlow from "@/pages/tip-flow";  
 import Success from "@/pages/success";
 import StyleGuide from "@/pages/styleguide";
 import Checkout from "@/pages/checkout";
@@ -20,7 +20,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/u/:handle" component={TipPage} />
+      <Route path="/u/:handle" component={TipFlow} />
       <Route path="/u/:handle/checkout" component={Checkout} />
       <Route path="/u/:handle/dashboard" component={Dashboard} />
       <Route path="/u/:handle/analytics" component={Analytics} />
