@@ -1,113 +1,112 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { PageContainer } from '@/components/layout/AppLayout';
-import { Button } from '@/components/ui/button';
-import { Sparkles, Zap, TrendingUp, Users } from 'lucide-react';
-import { Link } from 'wouter';
+import { motion } from "framer-motion";
+import { Link } from "wouter";
+import { ArrowRight, Sparkles, TrendingUp, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import GlassCard from "@/components/glass-card";
 
 export default function Home() {
   return (
-    <PageContainer maxWidth="max-w-4xl" className="text-center">
-      <motion.div
-        initial={{ opacity: 0, y: 50 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="space-y-8"
-      >
-        {/* Hero Section */}
-        <div className="space-y-6">
-          <motion.div
-            initial={{ scale: 0.8 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2, type: "spring" }}
-            className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6"
-          >
-            <Sparkles size={32} className="text-white" />
-          </motion.div>
-          
-          <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-teal-600 bg-clip-text text-transparent leading-tight">
-            TipVault
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-            The viral tipping platform that transforms service workers into money-earning powerhouses
-          </p>
-          
-          <div className="text-lg font-medium text-foreground">
-            💰 <span className="text-green-600 font-bold">300% earnings boost</span> through AI optimization
-          </div>
-        </div>
-
-        {/* Demo Section */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border border-white/20 rounded-2xl p-8 max-w-md mx-auto"
-        >
-          <h3 className="text-lg font-semibold mb-4">Try the Demo</h3>
-          <p className="text-muted-foreground mb-6 text-sm">
-            Experience our revolutionary Hold-to-Tip gesture and Smart Dock payment system
-          </p>
-          
-          <Link href="/u/demo">
-            <Button size="lg" className="w-full">
-              <Zap size={20} className="mr-2" />
-              View Demo Tip Page
-            </Button>
-          </Link>
-        </motion.div>
-
-        {/* Features Grid */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900/20 to-purple-900/30">
+      <div className="container mx-auto px-6 py-16 max-w-4xl">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="grid md:grid-cols-3 gap-6 max-w-3xl mx-auto"
+          transition={{ duration: 0.8 }}
+          className="text-center space-y-12"
         >
-          <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
-            <TrendingUp size={32} className="text-green-600 mx-auto mb-3" />
-            <h4 className="font-semibold mb-2">AI-Powered Optimization</h4>
-            <p className="text-sm text-muted-foreground">
-              Smart tip amount recommendations that boost earnings by 300%
+          {/* Hero Section */}
+          <div className="space-y-6">
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring" }}
+              className="w-20 h-20 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full flex items-center justify-center mx-auto"
+            >
+              <Sparkles size={28} className="text-white" />
+            </motion.div>
+            
+            <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent leading-tight">
+              TipVault
+            </h1>
+            
+            <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed">
+              The revolutionary tipping platform that boosts service worker earnings by 300%
             </p>
           </div>
-          
-          <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
-            <Zap size={32} className="text-blue-600 mx-auto mb-3" />
-            <h4 className="font-semibold mb-2">Hold-to-Tip Gesture</h4>
-            <p className="text-sm text-muted-foreground">
-              Revolutionary interface with haptic feedback and liquid animations
-            </p>
-          </div>
-          
-          <div className="bg-white/40 dark:bg-gray-800/40 backdrop-blur-sm border border-white/20 rounded-xl p-6 text-center">
-            <Users size={32} className="text-purple-600 mx-auto mb-3" />
-            <h4 className="font-semibold mb-2">Smart Payment Dock</h4>
-            <p className="text-sm text-muted-foreground">
-              Adaptive wallet selection: Venmo, Cash App, Zelle, Stripe
-            </p>
-          </div>
-        </motion.div>
 
-        {/* CTA Section */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.8 }}
-          className="space-y-4"
-        >
-          <h3 className="text-2xl font-bold">Ready to Transform Your Tips?</h3>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-              Get Started Free
-            </Button>
-            <Button variant="outline" size="lg">
-              Learn More
-            </Button>
-          </div>
+          {/* Demo CTA */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <GlassCard className="p-8 max-w-md mx-auto">
+              <h3 className="text-lg font-semibold text-white mb-4">Experience the Future</h3>
+              <p className="text-gray-300 mb-6 text-sm">
+                Try our revolutionary Hold-to-Tip gesture and Smart Payment Dock
+              </p>
+              
+              <Link href="/u/demo">
+                <Button size="lg" className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold">
+                  <Zap size={20} className="mr-2" />
+                  View Live Demo
+                  <ArrowRight size={16} className="ml-2" />
+                </Button>
+              </Link>
+            </GlassCard>
+          </motion.div>
+
+          {/* Features */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+            className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto"
+          >
+            <GlassCard className="p-6 text-center">
+              <TrendingUp size={32} className="text-green-400 mx-auto mb-4" />
+              <h4 className="font-semibold text-white mb-2">AI-Powered Tips</h4>
+              <p className="text-sm text-gray-300">
+                Smart recommendations boost earnings by 300% through data-driven optimization
+              </p>
+            </GlassCard>
+            
+            <GlassCard className="p-6 text-center">
+              <Zap size={32} className="text-blue-400 mx-auto mb-4" />
+              <h4 className="font-semibold text-white mb-2">Hold-to-Tip</h4>
+              <p className="text-sm text-gray-300">
+                Revolutionary gesture interface with haptic feedback and liquid animations
+              </p>
+            </GlassCard>
+            
+            <GlassCard className="p-6 text-center">
+              <Sparkles size={32} className="text-purple-400 mx-auto mb-4" />
+              <h4 className="font-semibold text-white mb-2">Smart Payments</h4>
+              <p className="text-sm text-gray-300">
+                Adaptive wallet selection: Venmo, Cash App, Zelle, and Stripe integration
+              </p>
+            </GlassCard>
+          </motion.div>
+
+          {/* Call to Action */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="space-y-6"
+          >
+            <h2 className="text-3xl font-bold text-white">Ready to Transform Your Tips?</h2>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold">
+                Start Earning More
+              </Button>
+              <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10">
+                Learn More
+              </Button>
+            </div>
+          </motion.div>
         </motion.div>
-      </motion.div>
-    </PageContainer>
+      </div>
+    </div>
   );
 }

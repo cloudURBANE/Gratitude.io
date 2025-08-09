@@ -278,7 +278,13 @@ export const walletPassesRelations = relations(walletPasses, ({ one }) => ({
 // Zod schemas for type safety
 export const insertUserSchema = createInsertSchema(users);
 export const insertProfileSchema = createInsertSchema(profiles);
-export const insertTipSchema = createInsertSchema(tips);
+export const insertTipSchema = createInsertSchema(tips).omit({
+  id: true,
+  createdAt: true,
+  processedAt: true,
+}).extend({
+  amount: z.union([z.number(), z.string().transform(val => parseFloat(val))]),
+});
 export const insertAnalyticsSchema = createInsertSchema(analytics);
 export const insertQrScanSchema = createInsertSchema(qrScans);
 export const insertEventSchema = createInsertSchema(events);
