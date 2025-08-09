@@ -65,7 +65,7 @@ export default function TipFlow() {
   // Auto-advance from amount to payment when amount is selected
   useEffect(() => {
     if (currentStep === "amount" && selectedAmount > 0) {
-      setTimeout(() => setCurrentStep("payment"), 500);
+      setTimeout(() => setCurrentStep("payment"), 800);
     }
   }, [selectedAmount, currentStep]);
 
@@ -77,8 +77,8 @@ export default function TipFlow() {
     // Simulate payment processing
     setTimeout(() => {
       setProcessingComplete(true);
-      setTimeout(() => setCurrentStep("review"), 800);
-    }, 2000);
+      setTimeout(() => setCurrentStep("review"), 1000);
+    }, 2200);
   };
 
   // Handle review actions
@@ -115,9 +115,24 @@ export default function TipFlow() {
   }
 
   const pageVariants = {
-    enter: { opacity: 0, x: 20, scale: 0.98 },
-    center: { opacity: 1, x: 0, scale: 1 },
-    exit: { opacity: 0, x: -20, scale: 0.98 }
+    enter: { 
+      opacity: 0, 
+      y: 15, 
+      scale: 0.96,
+      filter: "blur(4px)"
+    },
+    center: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1,
+      filter: "blur(0px)"
+    },
+    exit: { 
+      opacity: 0, 
+      y: -15, 
+      scale: 0.96,
+      filter: "blur(4px)"
+    }
   };
 
   return (
@@ -128,12 +143,13 @@ export default function TipFlow() {
           className="h-full bg-gradient-to-r from-accent-start to-accent-end"
           initial={{ width: "0%" }}
           animate={{
-            width: currentStep === "amount" ? "25%" :
-                  currentStep === "payment" ? "50%" :
-                  currentStep === "processing" ? "75%" :
+            width: currentStep === "amount" ? "20%" :
+                  currentStep === "payment" ? "40%" :
+                  currentStep === "processing" ? "70%" :
+                  currentStep === "review" ? "85%" :
                   "100%"
           }}
-          transition={{ duration: 0.3, ease: "easeOut" }}
+          transition={{ duration: 0.6, ease: [0.4, 0.0, 0.2, 1] }}
         />
       </div>
 
@@ -146,7 +162,11 @@ export default function TipFlow() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ 
+              duration: 0.35, 
+              ease: [0.4, 0.0, 0.2, 1],
+              filter: { duration: 0.2 }
+            }}
             className="min-h-screen flex flex-col"
           >
             {/* Header */}
@@ -229,7 +249,11 @@ export default function TipFlow() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ 
+              duration: 0.35, 
+              ease: [0.4, 0.0, 0.2, 1],
+              filter: { duration: 0.2 }
+            }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
             <div className="max-w-md mx-auto w-full">
@@ -261,7 +285,11 @@ export default function TipFlow() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ 
+              duration: 0.35, 
+              ease: [0.4, 0.0, 0.2, 1],
+              filter: { duration: 0.2 }
+            }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
             <div className="max-w-md mx-auto text-center">
@@ -317,7 +345,11 @@ export default function TipFlow() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ 
+              duration: 0.35, 
+              ease: [0.4, 0.0, 0.2, 1],
+              filter: { duration: 0.2 }
+            }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
             <div className="max-w-md mx-auto w-full">
@@ -413,7 +445,11 @@ export default function TipFlow() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            transition={{ 
+              duration: 0.35, 
+              ease: [0.4, 0.0, 0.2, 1],
+              filter: { duration: 0.2 }
+            }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
             <div className="max-w-md mx-auto text-center">

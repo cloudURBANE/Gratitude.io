@@ -286,6 +286,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
     let isActive = false;
 
     const handleTouchStart = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent scrolling
       const touch = e.touches[0];
       startX = touch.clientX;
       startY = touch.clientY;
@@ -293,6 +294,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent scrolling
       if (!isActive) return;
       
       const touch = e.touches[0];
@@ -310,13 +312,14 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
       }
     };
 
-    const handleTouchEnd = () => {
+    const handleTouchEnd = (e: TouchEvent) => {
+      e.preventDefault(); // Prevent scrolling
       isActive = false;
     };
 
-    canvas.addEventListener("touchstart", handleTouchStart, { passive: true });
-    canvas.addEventListener("touchmove", handleTouchMove, { passive: true });
-    canvas.addEventListener("touchend", handleTouchEnd);
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+    canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
 
     return () => {
       canvas.removeEventListener("touchstart", handleTouchStart);
@@ -416,10 +419,10 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
       <div className="relative mb-4">
         <canvas
           ref={canvasRef}
-          className="border border-glass-border rounded-lg mx-auto block"
+          className="border border-glass-border rounded-lg mx-auto block touch-none"
           width={dims.cssW}
           height={dims.cssH}
-          style={{ width: dims.cssW, height: dims.cssH }}
+          style={{ width: dims.cssW, height: dims.cssH, touchAction: 'none' }}
         />
         
         {/* Game overlay */}
