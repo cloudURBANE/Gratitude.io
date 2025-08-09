@@ -242,7 +242,7 @@ export default function Home() {
                   transition={{ delay: 1.2 }}
                   className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
                 >
-                  <Link href="/u/demo" className="group">
+                  <Link href="/login" className="group">
                     <button className="flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl font-black text-xl hover:shadow-2xl hover:shadow-green-500/30 transition-all transform hover:scale-105 group-hover:from-green-400 group-hover:to-emerald-500">
                       <DollarSign className="w-6 h-6" />
                       START EARNING NOW
@@ -378,7 +378,7 @@ export default function Home() {
               <p className="text-xl text-gray-300 mb-8">
                 Join 67,000+ workers already earning more with TipVault
               </p>
-              <Link href="/u/demo">
+              <Link href="/login">
                 <button className="px-12 py-6 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-2xl font-black text-2xl hover:shadow-2xl hover:shadow-green-500/40 transition-all transform hover:scale-105">
                   START YOUR MONEY VAULT
                 </button>

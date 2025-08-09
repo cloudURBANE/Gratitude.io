@@ -1,303 +1,592 @@
-import { useParams, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Link, useLocation } from "wouter";
+import { 
+  User, Settings, QrCode, BarChart3, DollarSign, TrendingUp, 
+  Camera, Upload, ExternalLink, Copy, Check, Crown, Sparkles
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
-import ReviewStats from "@/components/review-stats";
+import ImageUploader from "@/components/image-uploader";
 
-interface Worker {
+interface UserData {
   id: string;
   name: string;
-  role: string;
-  location: string;
-  handle: string;
-  avatar_url?: string;
-  todayStats: {
-    totalTips: number;
-    totalAmount: string;
-    avgAmount: string;
-  };
-}
-
-interface Analytics {
-  date: string;
-  totalTips: number;
-  totalAmount: string;
-  avgTipAmount: string;
-  qrScans: number;
-  conversionRate: string;
-}
-
-interface Tip {
-  id: string;
-  amount: string;
-  paymentMethod: string;
-  customerName: string;
-  note: string;
-  status: string;
+  email: string;
+  handle?: string;
+  avatarUrl?: string;
+  venmoHandle?: string;
+  cashappHandle?: string;
+  zelleHandle?: string;
   createdAt: string;
 }
 
-export default function Dashboard() {
-  const { handle } = useParams<{ handle: string }>();
+interface PaymentAccount {
+  id: string;
+  type: 'venmo' | 'cashapp' | 'zelle' | 'stripe';
+  handle: string;
+  verified: boolean;
+  icon: string;
+  name: string;
+}
 
-  const { data: worker, isLoading } = useQuery<Worker>({
-    queryKey: ["/api/workers", handle],
-    enabled: !!handle,
+export default function Dashboard() {
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  
+  const [user, setUser] = useState<UserData | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isEditing, setIsEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  const [paymentAccounts, setPaymentAccounts] = useState<PaymentAccount[]>([
+    { 
+      id: '1', 
+      type: 'venmo', 
+      handle: '', 
+      verified: false, 
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzNCN0ZCRiIvPgo8cGF0aCBkPSJNOCA2SDEwLjVMMTIgMTBMMTMuNSA2SDE2VjE4SDEzLjVWMTJMOSAxOEg2LjVWMTBMNy41IDZIOFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=', 
+      name: 'Venmo' 
+    },
+    { 
+      id: '2', 
+      type: 'cashapp', 
+      handle: '', 
+      verified: false, 
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzAwRDY4RiIvPgo8cGF0aCBkPSJNMTAgNkgxNEMxNS4xIDYgMTYgNi45IDE2IDhWMTZDMTYgMTcuMSAxNS4xIDE4IDE0IDE4SDEwQzguOSAxOCA4IDE3LjEgOCAxNlY4QzggNi45IDguOSA2IDEwIDZaTTEyIDhDMTAuOSA4IDEwIDguOSAxMCAxMFYxNEMxMCAxNS4xIDEwLjkgMTYgMTIgMTZDMTMuMSAxNiAxNCAxNS4xIDE0IDE0VjEwQzE0IDguOSAxMy4xIDggMTIgOFoiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=', 
+      name: 'Cash App' 
+    },
+    { 
+      id: '3', 
+      type: 'zelle', 
+      handle: '', 
+      verified: false, 
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzY5MzNCRCIvPgo8cGF0aCBkPSJNOCA2SDE2VjhIOUwxNiAxNlYxOEg4VjE2SDE1TDggOFY2WiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+Cg==', 
+      name: 'Zelle' 
+    },
+    { 
+      id: '4', 
+      type: 'stripe', 
+      handle: '', 
+      verified: false, 
+      icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiByeD0iNCIgZmlsbD0iIzYzNTJGRiIvPgo8cGF0aCBkPSJNMTAuNSA5QzEwLjUgOC4xIDExLjEgNy41IDEyIDcuNUMxMi45IDcuNSAxMy41IDguMSAxMy41IDlDMTMuNSA5LjkgMTIuOSAxMC41IDEyIDEwLjVDMTEuMSAxMC41IDEwLjUgOS45IDEwLjUgOVpNOC41IDEyQzguNSAxMS4xIDkuMSAxMC41IDEwIDEwLjVDMTAuOSAxMC41IDExLjUgMTEuMSAxMS41IDEyVjEzLjVIMTAuNUMxMC4xIDEzLjUgOS43IDEzLjMgOS41IDEzQzEwIDEyLjQgMTAuNSAxMS45IDEwLjUgMTFDOS42IDExIDkgMTEuNiA5IDEyLjVDOSAxMy40IDkuNiAxNCA4IDEzLjhDNi40IDEzLjMgOC4xIDEyLjUgOC41IDEyWiIgZmlsbD0id2hpdGUiLz4KPC9zdmc+Cg==', 
+      name: 'Stripe' 
+    },
+  ]);
+
+  const [editForm, setEditForm] = useState({
+    name: '',
+    handle: '',
+    venmoHandle: '',
+    cashappHandle: '',
+    zelleHandle: ''
   });
 
-  // Demo data for when handle is 'demo'
-  const demoWorker: Worker = {
-    id: 'demo-id',
-    name: 'Jordan M.',
-    role: 'Barista & Shift Lead',
-    location: 'Seattle, WA',
-    handle: 'demo',
-    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150',
-    todayStats: {
-      totalTips: 8,
-      totalAmount: '94.00',
-      avgAmount: '11.75',
-    },
+  // Mock stats data
+  const stats = {
+    totalTips: 2847.50,
+    todayTips: 127.25,
+    weekTips: 584.75,
+    qrScans: 1234,
+    conversionRate: 23.5,
+    avgTip: 12.75
   };
 
-  const displayWorker = handle === 'demo' ? demoWorker : worker;
+  useEffect(() => {
+    // Load user data from localStorage
+    const userData = localStorage.getItem('tipvault-user');
+    if (userData) {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      setEditForm({
+        name: parsedUser.name || '',
+        handle: parsedUser.handle || parsedUser.name?.toLowerCase().replace(/\s+/g, '') || '',
+        venmoHandle: parsedUser.venmoHandle || '',
+        cashappHandle: parsedUser.cashappHandle || '',
+        zelleHandle: parsedUser.zelleHandle || ''
+      });
+    } else {
+      setLocation('/login');
+    }
+  }, [setLocation]);
 
-  const { data: analytics } = useQuery<Analytics[]>({
-    queryKey: ["/api/workers", worker?.id, "analytics"],
-    enabled: !!worker?.id,
-  });
+  const handleLogout = () => {
+    localStorage.removeItem('tipvault-user');
+    toast({
+      title: "Logged out successfully",
+      description: "See you next time!",
+    });
+    setLocation('/');
+  };
 
-  const { data: recentTips } = useQuery<Tip[]>({
-    queryKey: ["/api/workers", worker?.id, "tips"],
-    enabled: !!worker?.id,
-  });
+  const handleSaveProfile = () => {
+    if (!user) return;
+    
+    const updatedUser = {
+      ...user,
+      ...editForm
+    };
+    
+    localStorage.setItem('tipvault-user', JSON.stringify(updatedUser));
+    setUser(updatedUser);
+    setIsEditing(false);
+    
+    toast({
+      title: "Profile updated!",
+      description: "Your information has been saved successfully.",
+    });
+  };
 
-  if (isLoading) {
+  const handlePaymentAccountUpdate = (accountId: string, handle: string) => {
+    setPaymentAccounts(prev => 
+      prev.map(account => 
+        account.id === accountId 
+          ? { ...account, handle, verified: handle.length > 0 }
+          : account
+      )
+    );
+  };
+
+  const copyTipLink = () => {
+    const tipLink = `${window.location.origin}/u/${editForm.handle || user?.handle || 'demo'}`;
+    navigator.clipboard.writeText(tipLink);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    
+    toast({
+      title: "Tip link copied!",
+      description: "Share this link to start receiving tips",
+    });
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const imageUrl = e.target?.result as string;
+        if (user) {
+          const updatedUser = { ...user, avatarUrl: imageUrl };
+          setUser(updatedUser);
+          localStorage.setItem('tipvault-user', JSON.stringify(updatedUser));
+          
+          toast({
+            title: "Profile photo updated!",
+            description: "Your new photo looks great!",
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  if (!user) {
     return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-accent-start border-t-transparent rounded-full" />
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
-
-  if (!displayWorker) {
-    return (
-      <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <GlassCard className="p-8 text-center max-w-md mx-4">
-          <h1 className="text-2xl font-bold text-text-primary mb-4">Dashboard Not Found</h1>
-          <p className="text-text-secondary mb-6">Worker dashboard not available.</p>
-        </GlassCard>
-      </div>
-    );
-  }
-
-  const totalEarnings = analytics?.reduce((sum, day) => sum + parseFloat(day.totalAmount || '0'), 0) || 0;
-  const avgConversion = analytics && analytics.length > 0 
-    ? analytics.reduce((sum, day) => sum + parseFloat(day.conversionRate || '0'), 0) / analytics.length 
-    : 15.4;
-  const totalScans = analytics?.reduce((sum, day) => sum + (day.qrScans || 0), 0) || 0;
 
   return (
-    <div className="min-h-screen bg-dark-bg">
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-10 w-32 h-32 bg-accent-start rounded-full filter blur-3xl opacity-10 animate-float"></div>
-        <div className="absolute bottom-20 right-10 w-40 h-40 bg-accent-end rounded-full filter blur-3xl opacity-10 animate-float" style={{ animationDelay: '-3s' }}></div>
-      </div>
-
-      <div className="relative z-10 max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+      {/* Header */}
+      <header className="border-b border-gray-700 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <img 
-                src={displayWorker.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150'} 
-                alt={displayWorker.name}
-                className="w-16 h-16 rounded-full object-cover border-2 border-glass-border" 
-              />
-              <div>
-                <h1 className="text-3xl font-bold text-text-primary">{displayWorker.name}</h1>
-                <p className="text-text-secondary">{displayWorker.role} • {displayWorker.location}</p>
+              <Link href="/">
+                <h1 className="text-2xl font-black bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
+                  TipVault
+                </h1>
+              </Link>
+              <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/20 border border-yellow-500/40 rounded-full text-yellow-300 text-sm font-medium">
+                <Crown className="w-4 h-4" />
+                Pro Account
               </div>
             </div>
             
-            {/* Navigation Menu */}
-            <div className="flex gap-2">
-              <Link href={`/u/${handle}`}>
-                <button className="flex items-center gap-2 px-4 py-2 glass-card hover:bg-glass-border rounded-xl text-text-primary transition-all duration-200">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-                  </svg>
-                  <span className="text-sm">Tip Page</span>
-                </button>
-              </Link>
-              
-              <Link href={`/u/${handle}/analytics`}>
-                <button className="flex items-center gap-2 px-4 py-2 glass-card hover:bg-glass-border rounded-xl text-text-primary transition-all duration-200">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                  </svg>
-                  <span className="text-sm">Analytics</span>
-                </button>
-              </Link>
-              
-              <Link href={`/u/${handle}/qr`}>
-                <button className="flex items-center gap-2 px-4 py-2 glass-card hover:bg-glass-border rounded-xl text-text-primary transition-all duration-200">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11a2 2 0 100-4m0 4a2 2 0 110 4m0-4v4m-6-11a2 2 0 00-4 0v4a2 2 0 004 0V9m0-4a2 2 0 014 0v1m-4-1a2 2 0 104 0"></path>
-                  </svg>
-                  <span className="text-sm">QR Codes</span>
-                </button>
-              </Link>
-              
-              <Link href={`/u/${handle}/settings`}>
-                <button className="flex items-center gap-2 px-4 py-2 glass-card hover:bg-glass-border rounded-xl text-text-primary transition-all duration-200">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                  </svg>
-                  <span className="text-sm">Settings</span>
-                </button>
-              </Link>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <div className="text-white font-semibold">{user.name}</div>
+                <div className="text-sm text-gray-400">{user.email}</div>
+              </div>
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center overflow-hidden">
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-6 h-6 text-white" />
+                )}
+              </div>
+              <button
+                onClick={handleLogout}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                Sign Out
+              </button>
             </div>
           </div>
-          
-          <div className="flex gap-4">
-            <GradientButton className="px-6 py-2">
-              Share QR Code
-            </GradientButton>
-            <button className="px-6 py-2 glass-card hover:bg-glass-border rounded-xl text-text-primary transition-all duration-200">
-              Edit Profile
-            </button>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <GlassCard className="p-6">
+              <nav className="space-y-2">
+                {[
+                  { id: 'overview', label: 'Overview', icon: BarChart3 },
+                  { id: 'profile', label: 'Profile Setup', icon: User },
+                  { id: 'payments', label: 'Payment Accounts', icon: DollarSign },
+                  { id: 'qr', label: 'QR & Links', icon: QrCode },
+                  { id: 'settings', label: 'Settings', icon: Settings },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-green-500 text-white'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+                    }`}
+                  >
+                    <tab.icon className="w-5 h-5" />
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+            </GlassCard>
           </div>
-        </div>
 
-        {/* Today's Performance */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <GlassCard className="p-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-accent-start mb-1">{displayWorker.todayStats.totalTips}</div>
-              <div className="text-sm text-text-secondary">Tips Today</div>
-            </div>
-          </GlassCard>
-          
-          <GlassCard className="p-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-text-primary mb-1">${displayWorker.todayStats.totalAmount}</div>
-              <div className="text-sm text-text-secondary">Today's Earnings</div>
-            </div>
-          </GlassCard>
-          
-          <GlassCard className="p-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-accent-end mb-1">${displayWorker.todayStats.avgAmount}</div>
-              <div className="text-sm text-text-secondary">Avg Tip Size</div>
-            </div>
-          </GlassCard>
-          
-          <GlassCard className="p-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-success mb-1">{avgConversion.toFixed(1)}%</div>
-              <div className="text-sm text-text-secondary">Conversion Rate</div>
-            </div>
-          </GlassCard>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Review Stats */}
-          <ReviewStats workerId={displayWorker.id} />
-
-          {/* Earnings Optimization Insights */}
-          <GlassCard className="p-6">
-            <h2 className="text-xl font-semibold text-text-primary mb-6">💡 Earning Optimization Tips</h2>
-            
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-4 bg-glass rounded-lg">
-                <div className="w-2 h-2 bg-accent-start rounded-full mt-2"></div>
-                <div>
-                  <div className="text-text-primary font-medium mb-1">Peak Hours Analysis</div>
-                  <div className="text-sm text-text-secondary">Your best earning hours are 2-4 PM and 7-9 PM. Consider optimizing your QR placement during these times.</div>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-glass rounded-lg">
-                <div className="w-2 h-2 bg-accent-end rounded-full mt-2"></div>
-                <div>
-                  <div className="text-text-primary font-medium mb-1">Payment Method Optimization</div>
-                  <div className="text-sm text-text-secondary">Customers tip 23% higher on average when using Stripe. Consider promoting card payments.</div>
-                </div>
-              </div>
-              
-              <div className="flex items-start gap-3 p-4 bg-glass rounded-lg">
-                <div className="w-2 h-2 bg-success rounded-full mt-2"></div>
-                <div>
-                  <div className="text-text-primary font-medium mb-1">QR Code Placement</div>
-                  <div className="text-sm text-text-secondary">Your {avgConversion.toFixed(1)}% conversion rate can be improved. Try placing QR codes at eye level near the register.</div>
-                </div>
-              </div>
-            </div>
-          </GlassCard>
-
-          {/* Performance Analytics */}
-          <GlassCard className="p-6">
-            <h2 className="text-xl font-semibold text-text-primary mb-6">📈 30-Day Performance</h2>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-text-secondary">Total Earnings</span>
-                <span className="text-2xl font-bold text-text-primary">${totalEarnings.toFixed(2)}</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-text-secondary">QR Code Scans</span>
-                <span className="text-xl font-semibold text-accent-start">{totalScans}</span>
-              </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-text-secondary">Avg Conversion Rate</span>
-                <span className="text-xl font-semibold text-success">{avgConversion.toFixed(1)}%</span>
-              </div>
-              
-              <div className="mt-6 p-4 bg-gradient-to-r from-accent-start to-accent-end rounded-lg">
-                <div className="text-white font-semibold mb-1">Earning Potential</div>
-                <div className="text-sm text-white opacity-90">
-                  With optimization, you could earn an additional ${(totalEarnings * 0.3).toFixed(2)} per month!
-                </div>
-              </div>
-            </div>
-          </GlassCard>
-        </div>
-
-        {/* Recent Tips */}
-        <GlassCard className="p-6 mt-8">
-          <h2 className="text-xl font-semibold text-text-primary mb-6">💰 Recent Tips</h2>
-          
-          <div className="space-y-3">
-            {recentTips?.slice(0, 8).map((tip) => (
-              <div key={tip.id} className="flex items-center justify-between p-3 bg-glass rounded-lg">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 bg-success rounded-full"></div>
-                  <div>
-                    <div className="text-text-primary font-medium">${tip.amount}</div>
-                    <div className="text-xs text-text-secondary">
-                      {tip.customerName || 'Anonymous'} • {tip.paymentMethod.charAt(0).toUpperCase() + tip.paymentMethod.slice(1)}
-                    </div>
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            {activeTab === 'overview' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-3xl font-bold text-white">Dashboard Overview</h2>
+                  <div className="flex items-center gap-2 text-green-400">
+                    <Sparkles className="w-5 h-5" />
+                    <span className="font-semibold">Earning Active</span>
                   </div>
                 </div>
-                <div className="text-xs text-text-secondary">
-                  {new Date(tip.createdAt).toLocaleTimeString()}
+
+                {/* Stats Grid */}
+                <div className="grid md:grid-cols-3 gap-6">
+                  <GlassCard className="p-6 bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/20">
+                    <div className="flex items-center justify-between mb-4">
+                      <DollarSign className="w-8 h-8 text-green-400" />
+                      <span className="text-xs text-green-400 font-medium">ALL TIME</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white mb-2">${stats.totalTips.toLocaleString()}</div>
+                    <div className="text-gray-400">Total Tips Earned</div>
+                  </GlassCard>
+
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <TrendingUp className="w-8 h-8 text-blue-400" />
+                      <span className="text-xs text-blue-400 font-medium">TODAY</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white mb-2">${stats.todayTips}</div>
+                    <div className="text-gray-400">Today's Earnings</div>
+                  </GlassCard>
+
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <QrCode className="w-8 h-8 text-purple-400" />
+                      <span className="text-xs text-purple-400 font-medium">SCANS</span>
+                    </div>
+                    <div className="text-3xl font-bold text-white mb-2">{stats.qrScans}</div>
+                    <div className="text-gray-400">QR Code Scans</div>
+                  </GlassCard>
                 </div>
-              </div>
-            )) || (
-              <div className="text-center text-text-secondary py-8">
-                No tips yet. Share your QR code to start earning!
-              </div>
+
+                {/* Quick Actions */}
+                <GlassCard className="p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">Quick Actions</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <Link href={`/u/${user.handle || 'demo'}`}>
+                      <button className="w-full flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg text-white hover:bg-green-500/20 transition-all">
+                        <ExternalLink className="w-5 h-5 text-green-400" />
+                        View Your Tip Page
+                      </button>
+                    </Link>
+                    <button
+                      onClick={copyTipLink}
+                      className="w-full flex items-center gap-3 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-white hover:bg-blue-500/20 transition-all"
+                    >
+                      {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5 text-blue-400" />}
+                      {copied ? 'Copied!' : 'Copy Tip Link'}
+                    </button>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+
+            {activeTab === 'profile' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <h2 className="text-3xl font-bold text-white">Profile Setup</h2>
+
+                <GlassCard className="p-6">
+                  <div className="space-y-6">
+                    {/* Profile Photo */}
+                    <div className="text-center">
+                      <ImageUploader
+                        currentImage={user.avatarUrl}
+                        onImageChange={(imageUrl) => {
+                          const updatedUser = { ...user, avatarUrl: imageUrl };
+                          setUser(updatedUser);
+                          localStorage.setItem('tipvault-user', JSON.stringify(updatedUser));
+                          
+                          toast({
+                            title: "Profile photo updated!",
+                            description: "Your new photo looks great!",
+                          });
+                        }}
+                        size="lg"
+                      />
+                      <p className="text-gray-400 text-sm mt-2">Click to upload or drag & drop photo</p>
+                    </div>
+
+                    {/* Form Fields */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Display Name</label>
+                        <input
+                          type="text"
+                          value={editForm.name}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                          className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none transition-colors"
+                          placeholder="Your display name"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Username/Handle</label>
+                        <input
+                          type="text"
+                          value={editForm.handle}
+                          onChange={(e) => setEditForm(prev => ({ ...prev, handle: e.target.value.toLowerCase().replace(/[^a-z0-9]/g, '') }))}
+                          className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none transition-colors"
+                          placeholder="your-handle"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Your tip page: tipvault.com/u/{editForm.handle}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <GradientButton onClick={handleSaveProfile}>
+                        Save Profile
+                      </GradientButton>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+
+            {activeTab === 'payments' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div className="flex items-center justify-between">
+                  <h2 className="text-3xl font-bold text-white">Payment Accounts</h2>
+                  <div className="text-sm text-gray-400">
+                    Connect your accounts to receive tips
+                  </div>
+                </div>
+
+                <div className="grid gap-4">
+                  {paymentAccounts.map(account => (
+                    <GlassCard key={account.id} className="p-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden">
+                          <img src={account.icon} alt={account.name} className="w-full h-full object-cover" />
+                        </div>
+                        
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <h3 className="text-lg font-semibold text-white">{account.name}</h3>
+                            {account.verified && (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-green-500/20 border border-green-500/40 rounded-full text-green-400 text-xs font-medium">
+                                <Check className="w-3 h-3" />
+                                Connected
+                              </div>
+                            )}
+                          </div>
+                          
+                          <input
+                            type="text"
+                            value={account.handle}
+                            onChange={(e) => handlePaymentAccountUpdate(account.id, e.target.value)}
+                            className="w-full bg-gray-800/50 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none transition-colors"
+                            placeholder={
+                              account.type === 'venmo' ? '@your-venmo-handle' :
+                              account.type === 'cashapp' ? '$your-cashtag' :
+                              account.type === 'zelle' ? 'your-email@example.com' :
+                              'Connect Stripe account'
+                            }
+                          />
+                        </div>
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+
+                <GlassCard className="p-6 bg-blue-500/10 border-blue-500/20">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-sm font-bold">💡</span>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-semibold mb-2">Pro Tip</h3>
+                      <p className="text-gray-300 text-sm">
+                        Connect multiple payment methods to give customers more options. 
+                        This can increase your tips by up to 40%!
+                      </p>
+                    </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            )}
+
+            {activeTab === 'qr' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <h2 className="text-3xl font-bold text-white">QR Code & Links</h2>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <GlassCard className="p-6">
+                    <h3 className="text-xl font-semibold text-white mb-4">Your QR Code</h3>
+                    <div className="bg-white p-4 rounded-lg mb-4">
+                      <div className="w-48 h-48 mx-auto bg-gray-100 flex items-center justify-center">
+                        <QrCode className="w-32 h-32 text-gray-400" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="flex-1 flex items-center gap-2 justify-center py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors">
+                        <Upload className="w-4 h-4" />
+                        Download
+                      </button>
+                      <button className="flex-1 flex items-center gap-2 justify-center py-2 border border-gray-600 text-gray-300 rounded-lg font-medium hover:bg-gray-700 transition-colors">
+                        <Copy className="w-4 h-4" />
+                        Copy
+                      </button>
+                    </div>
+                  </GlassCard>
+
+                  <GlassCard className="p-6">
+                    <h3 className="text-xl font-semibold text-white mb-4">Share Your Link</h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Your Tip Page URL</label>
+                        <div className="flex">
+                          <input
+                            type="text"
+                            value={`${window.location.origin}/u/${editForm.handle || user.handle || 'demo'}`}
+                            readOnly
+                            className="flex-1 bg-gray-800/50 border border-gray-600 rounded-l-lg px-4 py-3 text-white"
+                          />
+                          <button
+                            onClick={copyTipLink}
+                            className="px-4 py-3 bg-green-500 text-white rounded-r-lg hover:bg-green-600 transition-colors"
+                          >
+                            {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <button className="w-full flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg text-white hover:bg-blue-500/20 transition-all">
+                          <span className="text-xl">📱</span>
+                          Share on Social Media
+                        </button>
+                        <button className="w-full flex items-center gap-3 p-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white hover:bg-gray-700 transition-all">
+                          <span className="text-xl">📧</span>
+                          Send via Email
+                        </button>
+                        <button className="w-full flex items-center gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-white hover:bg-green-500/20 transition-all">
+                          <span className="text-xl">💬</span>
+                          Share via Text
+                        </button>
+                      </div>
+                    </div>
+                  </GlassCard>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'settings' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <h2 className="text-3xl font-bold text-white">Settings</h2>
+
+                <GlassCard className="p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">Account Settings</h3>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between py-3 border-b border-gray-700">
+                      <div>
+                        <div className="text-white font-medium">Email Notifications</div>
+                        <div className="text-gray-400 text-sm">Receive tip notifications via email</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" defaultChecked />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between py-3 border-b border-gray-700">
+                      <div>
+                        <div className="text-white font-medium">SMS Notifications</div>
+                        <div className="text-gray-400 text-sm">Get instant SMS alerts for tips</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between py-3">
+                      <div>
+                        <div className="text-white font-medium">Public Profile</div>
+                        <div className="text-gray-400 text-sm">Make your profile discoverable</div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" defaultChecked />
+                        <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
+                      </label>
+                    </div>
+                  </div>
+                </GlassCard>
+
+                <GlassCard className="p-6">
+                  <h3 className="text-xl font-semibold text-white mb-4">Danger Zone</h3>
+                  <div className="space-y-4">
+                    <button className="w-full p-4 border border-red-500/50 bg-red-500/10 text-red-400 rounded-lg hover:bg-red-500/20 transition-all">
+                      Delete Account
+                    </button>
+                  </div>
+                </GlassCard>
+              </motion.div>
             )}
           </div>
-        </GlassCard>
+        </div>
       </div>
     </div>
   );

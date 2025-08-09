@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useEffect } from "react";
 
 import Home from "@/pages/home";
+import Login from "@/pages/login";
 import TipFlow from "@/pages/tip-flow";  
 import Success from "@/pages/success";
 import StyleGuide from "@/pages/styleguide";
@@ -20,9 +21,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/u/:handle" component={TipFlow} />
       <Route path="/u/:handle/checkout" component={Checkout} />
-      <Route path="/u/:handle/dashboard" component={Dashboard} />
       <Route path="/u/:handle/analytics" component={Analytics} />
       <Route path="/u/:handle/qr" component={QRGenerator} />
       <Route path="/u/:handle/settings" component={ProfileSettings} />
