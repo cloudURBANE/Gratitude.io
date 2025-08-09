@@ -26,6 +26,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
   const [paused, setPaused] = useState(true); // Start paused
   const [method, setMethod] = useState<PayMethod>(defaultPayMethod());
   const [showZelle, setShowZelle] = useState(false);
+  const [gameActive, setGameActive] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameLoopRef = useRef<number>();
@@ -113,15 +114,48 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
     });
   }, [dir, food, generateFood]);
 
+  // Screen wake lock and body class during gameplay
+  useEffect(() => {
+    let wakeLock: any = null;
+
+    const requestWakeLock = async () => {
+      if (gameActive && 'wakeLock' in navigator) {
+        try {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+        } catch (err) {
+          // Wake lock not supported or denied
+        }
+      }
+    };
+
+    if (gameActive && !paused && alive) {
+      // Prevent screen scrolling during gameplay
+      document.body.classList.add('game-active');
+      requestWakeLock();
+    } else {
+      // Remove scroll prevention when game is inactive
+      document.body.classList.remove('game-active');
+    }
+
+    return () => {
+      document.body.classList.remove('game-active');
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+      }
+    };
+  }, [gameActive, paused, alive]);
+
   // Game loop
   useEffect(() => {
     if (!alive || paused) {
       if (gameLoopRef.current) {
         cancelAnimationFrame(gameLoopRef.current);
       }
+      setGameActive(false);
       return;
     }
 
+    setGameActive(true);
     let lastTime = performance.now();
     const tickInterval = Math.max(80, TICK_MS_BASE - score * 2);
 
@@ -423,16 +457,34 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
       {/* Game Canvas */}
       <motion.div 
         className="relative mb-4"
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
+        initial={{ scale: 0.85, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ 
+          duration: 0.5, 
+          delay: 0.1,
+          ease: [0.4, 0.0, 0.2, 1]
+        }}
       >
-        <canvas
+        <motion.canvas
           ref={canvasRef}
           className="border border-glass-border rounded-lg mx-auto block touch-none shadow-lg"
           width={dims.cssW}
           height={dims.cssH}
           style={{ width: dims.cssW, height: dims.cssH, touchAction: 'none' }}
+          animate={gameActive ? {
+            boxShadow: [
+              "0 4px 20px rgba(139, 69, 255, 0.2)",
+              "0 4px 30px rgba(139, 69, 255, 0.4)",
+              "0 4px 20px rgba(139, 69, 255, 0.2)"
+            ]
+          } : {}}
+          transition={{
+            boxShadow: {
+              duration: 2.5,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }
+          }}
         />
       </motion.div>
         
@@ -522,13 +574,29 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
           </div>
 
           {/* Pay button */}
-          <button
+          <motion.button
             onClick={handlePayNow}
             disabled={tipAmount === 0}
-            className="w-full py-3 bg-gradient-to-r from-accent-start to-accent-end rounded-lg text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="w-full py-3 bg-gradient-to-r from-accent-start to-accent-end rounded-lg text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all relative overflow-hidden"
+            animate={tipAmount > 0 ? {
+              boxShadow: [
+                "0 4px 20px rgba(139, 69, 255, 0.3)",
+                "0 8px 35px rgba(139, 69, 255, 0.5)",
+                "0 4px 20px rgba(139, 69, 255, 0.3)"
+              ]
+            } : {}}
+            transition={{
+              boxShadow: {
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut"
+              }
+            }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
             Send ${tipAmount}
-          </button>
+          </motion.button>
         </>
       )}
 

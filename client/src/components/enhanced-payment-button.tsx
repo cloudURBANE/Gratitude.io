@@ -50,7 +50,7 @@ export default function EnhancedPaymentButton({
         transition={{
           opacity: { duration: 0.8, ease: "easeOut" },
           scale: { 
-            duration: paymentMethod ? 2 : 6, 
+            duration: paymentMethod ? 3.5 : 4.5, 
             repeat: Infinity, 
             ease: "easeInOut" 
           }

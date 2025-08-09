@@ -140,10 +140,12 @@ export default function SmartDock({
           filter: 'blur(20px)',
         }}
         animate={{
-          opacity: [0.3, 0.6, 0.3],
+          opacity: [0.2, 0.5, 0.2],
+          scale: [1, 1.05, 1]
         }}
         transition={{
-          duration: 0.8,
+          duration: 3.2,
+          repeat: Infinity,
           ease: "easeInOut"
         }}
       />

@@ -163,7 +163,11 @@ export default function TipFlow() {
                   currentStep === "review" ? "85%" :
                   "100%"
           }}
-          transition={{ duration: 0.6, ease: [0.4, 0.0, 0.2, 1] }}
+          transition={{ 
+            duration: 0.8, 
+            ease: [0.25, 0.1, 0.25, 1],
+            type: "tween"
+          }}
         />
       </div>
 
@@ -177,9 +181,9 @@ export default function TipFlow() {
             animate="center"
             exit="exit"
             transition={{ 
-              duration: 0.35, 
-              ease: [0.4, 0.0, 0.2, 1],
-              filter: { duration: 0.2 }
+              duration: 0.45, 
+              ease: [0.25, 0.1, 0.25, 1],
+              filter: { duration: 0.3 }
             }}
             className="min-h-screen flex flex-col"
           >
@@ -266,9 +270,9 @@ export default function TipFlow() {
             animate="center"
             exit="exit"
             transition={{ 
-              duration: 0.35, 
-              ease: [0.4, 0.0, 0.2, 1],
-              filter: { duration: 0.2 }
+              duration: 0.45, 
+              ease: [0.25, 0.1, 0.25, 1],
+              filter: { duration: 0.3 }
             }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
@@ -302,9 +306,9 @@ export default function TipFlow() {
             animate="center"
             exit="exit"
             transition={{ 
-              duration: 0.35, 
-              ease: [0.4, 0.0, 0.2, 1],
-              filter: { duration: 0.2 }
+              duration: 0.45, 
+              ease: [0.25, 0.1, 0.25, 1],
+              filter: { duration: 0.3 }
             }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
@@ -362,9 +366,9 @@ export default function TipFlow() {
             animate="center"
             exit="exit"
             transition={{ 
-              duration: 0.35, 
-              ease: [0.4, 0.0, 0.2, 1],
-              filter: { duration: 0.2 }
+              duration: 0.45, 
+              ease: [0.25, 0.1, 0.25, 1],
+              filter: { duration: 0.3 }
             }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
@@ -462,9 +466,9 @@ export default function TipFlow() {
             animate="center"
             exit="exit"
             transition={{ 
-              duration: 0.35, 
-              ease: [0.4, 0.0, 0.2, 1],
-              filter: { duration: 0.2 }
+              duration: 0.45, 
+              ease: [0.25, 0.1, 0.25, 1],
+              filter: { duration: 0.3 }
             }}
             className="min-h-screen flex flex-col justify-center px-4"
           >
