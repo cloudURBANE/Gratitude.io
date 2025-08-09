@@ -1,270 +1,766 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Pause, RotateCcw, Trophy } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import GlassCard from "@/components/glass-card";
+import { buildPayUrl, defaultPayMethod, type PayMethod } from "@/lib/snake-pay";
+import { useToast } from "@/hooks/use-toast";
 
-interface Position {
-  x: number;
-  y: number;
-}
+type Cell = { x: number; y: number };
+type Dir = "up" | "down" | "left" | "right";
 
 interface SnakeGameProps {
-  onFoodEaten: (tipAmount: number) => void;
-  onGameComplete: (totalTips: number) => void;
+  worker: any;
+  onTipEarned: (amount: number, method: PayMethod) => void;
   className?: string;
 }
 
-const GRID_SIZE = 12;
-const CELL_SIZE = 20;
-const INITIAL_SNAKE = [{ x: 6, y: 6 }];
-const DIRECTIONS = {
-  UP: { x: 0, y: -1 },
-  DOWN: { x: 0, y: 1 },
-  LEFT: { x: -1, y: 0 },
-  RIGHT: { x: 1, y: 0 }
-};
+// Game config
+const COLS = 14;
+const ROWS = 16;
+const TICK_MS_BASE = 160;
+const DOLLARS_PER_FOOD = 1;
 
-// Quick tip amounts that appear as food
-const TIP_AMOUNTS = [1, 2, 3, 5, 10, 15, 20];
-
-export default function SnakeGame({ onFoodEaten, onGameComplete, className }: SnakeGameProps) {
-  const [snake, setSnake] = useState<Position[]>(INITIAL_SNAKE);
-  const [food, setFood] = useState<Position & { amount: number }>({ x: 3, y: 3, amount: 5 });
-  const [direction, setDirection] = useState(DIRECTIONS.RIGHT);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
+export default function SnakeGame({ worker, onTipEarned, className = "" }: SnakeGameProps) {
+  const { toast } = useToast();
   const [score, setScore] = useState(0);
-  const [totalTips, setTotalTips] = useState(0);
+  const [dir, setDir] = useState<Dir>("right");
+  const [alive, setAlive] = useState(true);
+  const [paused, setPaused] = useState(true); // Start paused
+  const [method, setMethod] = useState<PayMethod>(defaultPayMethod());
+  const [showZelle, setShowZelle] = useState(false);
+  const [gameActive, setGameActive] = useState(false);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gameLoopRef = useRef<number>();
 
-  const generateFood = useCallback(() => {
-    let newFood: Position & { amount: number };
-    do {
-      newFood = {
-        x: Math.floor(Math.random() * GRID_SIZE),
-        y: Math.floor(Math.random() * GRID_SIZE),
-        amount: TIP_AMOUNTS[Math.floor(Math.random() * TIP_AMOUNTS.length)]
-      };
-    } while (snake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
-    return newFood;
-  }, [snake]);
+  // Initialize snake and food
+  const [snake, setSnake] = useState<Cell[]>(() => [
+    { x: 4, y: 10 }, { x: 3, y: 10 }, { x: 2, y: 10 }
+  ]);
+  const [food, setFood] = useState<Cell>(() => ({ x: 8, y: 10 }));
 
-  const resetGame = useCallback(() => {
-    setSnake(INITIAL_SNAKE);
-    setFood({ x: 3, y: 3, amount: 5 });
-    setDirection(DIRECTIONS.RIGHT);
-    setIsPlaying(false);
-    setGameOver(false);
-    setScore(0);
-    setTotalTips(0);
+  // Responsive canvas sizing
+  const [tile, dims] = useMemo(() => {
+    const maxWidth = 280;
+    const size = Math.floor(maxWidth / COLS);
+    return [size, { cssW: size * COLS, cssH: size * ROWS }];
   }, []);
 
-  const moveSnake = useCallback(() => {
-    setSnake(currentSnake => {
-      if (currentSnake.length === 0) return currentSnake;
-
-      const head = currentSnake[0];
-      const newHead = {
-        x: head.x + direction.x,
-        y: head.y + direction.y
+  // Random food placement
+  const generateFood = useCallback((currentSnake: Cell[]): Cell => {
+    let newFood: Cell;
+    let attempts = 0;
+    do {
+      // Generate food away from edges for better animation visibility
+      const margin = 2; // Keep food 2 tiles away from edges for sparkle animations
+      const safeWidth = COLS - margin * 2;
+      const safeHeight = ROWS - margin * 2;
+      
+      newFood = {
+        x: margin + Math.floor(Math.random() * safeWidth),
+        y: margin + Math.floor(Math.random() * safeHeight)
       };
+      attempts++;
+      // Prevent infinite loop if snake fills most of the board
+      if (attempts > 100) break;
+    } while (currentSnake.some(segment => segment.x === newFood.x && segment.y === newFood.y));
+    return newFood;
+  }, []);
 
-      // Check walls
-      if (newHead.x < 0 || newHead.x >= GRID_SIZE || newHead.y < 0 || newHead.y >= GRID_SIZE) {
-        setGameOver(true);
-        setIsPlaying(false);
-        onGameComplete(totalTips);
-        return currentSnake;
+  // Game step logic
+  const step = useCallback(() => {
+    setSnake(prevSnake => {
+      const head = prevSnake[0];
+      let newX = head.x;
+      let newY = head.y;
+
+      // Update position based on direction
+      switch (dir) {
+        case "right":
+          newX = head.x + 1;
+          break;
+        case "left":
+          newX = head.x - 1;
+          break;
+        case "down":
+          newY = head.y + 1;
+          break;
+        case "up":
+          newY = head.y - 1;
+          break;
       }
+
+      // Check boundary collision (game ends when hitting walls)
+      if (newX < 0 || newX >= COLS || newY < 0 || newY >= ROWS) {
+        setAlive(false);
+        setPaused(true);
+        return prevSnake;
+      }
+
+      const newHead = { x: newX, y: newY };
 
       // Check self collision
-      if (currentSnake.some(segment => segment.x === newHead.x && segment.y === newHead.y)) {
-        setGameOver(true);
-        setIsPlaying(false);
-        onGameComplete(totalTips);
-        return currentSnake;
+      if (prevSnake.some(segment => segment.x === newX && segment.y === newY)) {
+        setAlive(false);
+        setPaused(true);
+        return prevSnake;
       }
-
-      const newSnake = [newHead, ...currentSnake];
 
       // Check food collision
-      if (newHead.x === food.x && newHead.y === food.y) {
-        setScore(prev => prev + food.amount);
-        setTotalTips(prev => prev + food.amount);
-        onFoodEaten(food.amount);
-        setFood(generateFood());
-        return newSnake; // Don't remove tail when eating
+      if (newX === food.x && newY === food.y) {
+        setScore(s => s + 1);
+        const grownSnake = [newHead, ...prevSnake];
+        setFood(generateFood(grownSnake));
+        
+        // Haptic feedback
+        if ('vibrate' in navigator) {
+          navigator.vibrate(50);
+        }
+        
+        return grownSnake;
       }
 
-      return newSnake.slice(0, -1); // Remove tail
+      // Normal move
+      return [newHead, ...prevSnake.slice(0, -1)];
     });
-  }, [direction, food, generateFood, onFoodEaten, onGameComplete, totalTips]);
+  }, [dir, food, generateFood]);
+
+  // Screen wake lock and body class during gameplay
+  useEffect(() => {
+    let wakeLock: any = null;
+
+    const requestWakeLock = async () => {
+      if (gameActive && 'wakeLock' in navigator) {
+        try {
+          wakeLock = await (navigator as any).wakeLock.request('screen');
+        } catch (err) {
+          // Wake lock not supported or denied
+        }
+      }
+    };
+
+    if (gameActive && !paused && alive) {
+      // Add body class but don't prevent all scrolling to avoid view snapping
+      document.body.classList.add('game-active');
+      requestWakeLock();
+    } else {
+      // Remove class when game is inactive
+      document.body.classList.remove('game-active');
+    }
+
+    return () => {
+      document.body.classList.remove('game-active');
+      if (wakeLock) {
+        wakeLock.release().catch(() => {});
+      }
+    };
+  }, [gameActive, paused, alive]);
 
   // Game loop
   useEffect(() => {
-    if (isPlaying && !gameOver) {
-      gameLoopRef.current = setInterval(moveSnake, 200);
-      return () => {
-        if (gameLoopRef.current) clearInterval(gameLoopRef.current);
-      };
+    if (!alive || paused) {
+      if (gameLoopRef.current) {
+        cancelAnimationFrame(gameLoopRef.current);
+      }
+      setGameActive(false);
+      return;
     }
-  }, [isPlaying, gameOver, moveSnake]);
+
+    setGameActive(true);
+    let lastTime = performance.now();
+    // Speed increases subtly after $5 earned, then accelerates further
+    const speedBoost = score >= 5 ? Math.floor((score - 5) / 3) * 8 : 0;
+    const tickInterval = Math.max(70, TICK_MS_BASE - score * 1.5 - speedBoost);
+
+    const gameLoop = (currentTime: number) => {
+      if (currentTime - lastTime >= tickInterval) {
+        step();
+        lastTime = currentTime;
+      }
+      gameLoopRef.current = requestAnimationFrame(gameLoop);
+    };
+
+    gameLoopRef.current = requestAnimationFrame(gameLoop);
+
+    return () => {
+      if (gameLoopRef.current) {
+        cancelAnimationFrame(gameLoopRef.current);
+      }
+    };
+  }, [alive, paused, step, score]);
+
+  // Canvas rendering
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = dims.cssW * dpr;
+    canvas.height = dims.cssH * dpr;
+    canvas.style.width = `${dims.cssW}px`;
+    canvas.style.height = `${dims.cssH}px`;
+    ctx.scale(dpr, dpr);
+
+    // Clear canvas with gradient background
+    const gradient = ctx.createRadialGradient(dims.cssW/2, dims.cssH/2, 0, dims.cssW/2, dims.cssH/2, Math.max(dims.cssW, dims.cssH)/2);
+    gradient.addColorStop(0, "rgba(139, 69, 255, 0.05)");
+    gradient.addColorStop(1, "rgba(6, 182, 212, 0.02)");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, dims.cssW, dims.cssH);
+
+    // Draw animated border with pulsing effect
+    const time = Date.now() * 0.001;
+    const borderPulse = 0.3 + Math.sin(time) * 0.1;
+    
+    // Outer border with glow
+    ctx.save();
+    ctx.strokeStyle = `rgba(139, 69, 255, ${borderPulse})`;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = "rgba(139, 69, 255, 0.5)";
+    ctx.shadowBlur = 10;
+    ctx.strokeRect(2, 2, dims.cssW - 4, dims.cssH - 4);
+    ctx.restore();
+
+    // Inner decorative corners
+    const cornerSize = tile * 0.8;
+    ctx.strokeStyle = `rgba(6, 182, 212, ${borderPulse * 0.7})`;
+    ctx.lineWidth = 2;
+    
+    // Top-left corner
+    ctx.beginPath();
+    ctx.moveTo(8, 8 + cornerSize);
+    ctx.lineTo(8, 8);
+    ctx.lineTo(8 + cornerSize, 8);
+    ctx.stroke();
+    
+    // Top-right corner
+    ctx.beginPath();
+    ctx.moveTo(dims.cssW - 8 - cornerSize, 8);
+    ctx.lineTo(dims.cssW - 8, 8);
+    ctx.lineTo(dims.cssW - 8, 8 + cornerSize);
+    ctx.stroke();
+    
+    // Bottom-left corner
+    ctx.beginPath();
+    ctx.moveTo(8, dims.cssH - 8 - cornerSize);
+    ctx.lineTo(8, dims.cssH - 8);
+    ctx.lineTo(8 + cornerSize, dims.cssH - 8);
+    ctx.stroke();
+    
+    // Bottom-right corner
+    ctx.beginPath();
+    ctx.moveTo(dims.cssW - 8 - cornerSize, dims.cssH - 8);
+    ctx.lineTo(dims.cssW - 8, dims.cssH - 8);
+    ctx.lineTo(dims.cssW - 8, dims.cssH - 8 - cornerSize);
+    ctx.stroke();
+
+    // Draw subtle grid with fading effect
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+    ctx.lineWidth = 1;
+    for (let x = 1; x < COLS; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * tile, 6);
+      ctx.lineTo(x * tile, dims.cssH - 6);
+      ctx.stroke();
+    }
+    for (let y = 1; y < ROWS; y++) {
+      ctx.beginPath();
+      ctx.moveTo(6, y * tile);
+      ctx.lineTo(dims.cssW - 6, y * tile);
+      ctx.stroke();
+    }
+
+    // Draw animated food (glowing dollar sign with sparkles)
+    const foodX = food.x * tile + tile / 2;
+    const foodY = food.y * tile + tile / 2;
+    const foodTime = Date.now() * 0.003;
+    const foodPulse = 0.8 + Math.sin(foodTime * 2) * 0.2;
+    
+    ctx.save();
+    
+    // Outer glow ring
+    ctx.beginPath();
+    ctx.arc(foodX, foodY, tile * 0.4 * foodPulse, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(16, 185, 129, ${0.2 * foodPulse})`;
+    ctx.fill();
+    
+    // Inner dollar sign with glow
+    ctx.shadowColor = "#10B981";
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = `rgba(16, 185, 129, ${foodPulse})`;
+    ctx.font = `bold ${tile * 0.7}px Arial`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("$", foodX, foodY);
+    
+    // Sparkle effects around food
+    for (let i = 0; i < 4; i++) {
+      const sparkleAngle = foodTime + (i * Math.PI / 2);
+      const sparkleDistance = tile * 0.6;
+      const sparkleX = foodX + Math.cos(sparkleAngle) * sparkleDistance;
+      const sparkleY = foodY + Math.sin(sparkleAngle) * sparkleDistance;
+      const sparkleSize = 2 + Math.sin(foodTime * 3 + i) * 1;
+      
+      ctx.beginPath();
+      ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(16, 185, 129, ${0.4 + Math.sin(foodTime * 2 + i) * 0.3})`;
+      ctx.fill();
+    }
+    
+    ctx.restore();
+
+    // Draw beautiful snake with gradient and animation
+    const snakeTime = Date.now() * 0.002;
+    
+    snake.forEach((segment, index) => {
+      const x = segment.x * tile + 2;
+      const y = segment.y * tile + 2;
+      const size = tile - 4;
+      const isHead = index === 0;
+      const isTail = index === snake.length - 1;
+
+      ctx.save();
+      
+      if (isHead) {
+        // Animated head with breathing effect
+        const headPulse = 1 + Math.sin(snakeTime * 4) * 0.05;
+        const headSize = size * headPulse;
+        const headOffset = (size - headSize) / 2;
+        
+        // Head glow
+        ctx.shadowColor = "#8B45FF";
+        ctx.shadowBlur = 15;
+        
+        // Head gradient
+        const headGradient = ctx.createRadialGradient(
+          x + size/2, y + size/2, 0,
+          x + size/2, y + size/2, size/2
+        );
+        headGradient.addColorStop(0, "#A855F7");
+        headGradient.addColorStop(1, "#8B45FF");
+        
+        ctx.fillStyle = headGradient;
+        ctx.beginPath();
+        ctx.roundRect(x + headOffset, y + headOffset, headSize, headSize, 4);
+        ctx.fill();
+        
+        // Animated eyes with direction
+        ctx.fillStyle = "#FFFFFF";
+        const eyeSize = size * 0.2;
+        const eyePulse = 0.8 + Math.sin(snakeTime * 6) * 0.2;
+        const eyeActualSize = eyeSize * eyePulse;
+        
+        let eye1X, eye1Y, eye2X, eye2Y;
+        
+        if (dir === "up") {
+          eye1X = x + size * 0.25; eye1Y = y + size * 0.3;
+          eye2X = x + size * 0.55; eye2Y = y + size * 0.3;
+        } else if (dir === "down") {
+          eye1X = x + size * 0.25; eye1Y = y + size * 0.5;
+          eye2X = x + size * 0.55; eye2Y = y + size * 0.5;
+        } else if (dir === "left") {
+          eye1X = x + size * 0.2; eye1Y = y + size * 0.25;
+          eye2X = x + size * 0.2; eye2Y = y + size * 0.55;
+        } else {
+          eye1X = x + size * 0.6; eye1Y = y + size * 0.25;
+          eye2X = x + size * 0.6; eye2Y = y + size * 0.55;
+        }
+        
+        ctx.beginPath();
+        ctx.arc(eye1X, eye1Y, eyeActualSize, 0, Math.PI * 2);
+        ctx.arc(eye2X, eye2Y, eyeActualSize, 0, Math.PI * 2);
+        ctx.fill();
+        
+      } else {
+        // Body segments with flowing gradient
+        const segmentProgress = index / snake.length;
+        const flowOffset = snakeTime + index * 0.5;
+        const bodyPulse = 0.95 + Math.sin(flowOffset) * 0.05;
+        const bodySize = size * bodyPulse;
+        const bodyOffset = (size - bodySize) / 2;
+        
+        // Body gradient that flows along the snake
+        const bodyGradient = ctx.createLinearGradient(x, y, x + size, y + size);
+        const hue1 = (270 + Math.sin(flowOffset) * 30) % 360; // Purple to blue range
+        const hue2 = (200 + Math.sin(flowOffset + 1) * 30) % 360;
+        
+        bodyGradient.addColorStop(0, `hsl(${hue1}, 70%, ${60 + segmentProgress * 10}%)`);
+        bodyGradient.addColorStop(1, `hsl(${hue2}, 80%, ${50 + segmentProgress * 15}%)`);
+        
+        ctx.shadowColor = `hsla(${hue1}, 70%, 60%, 0.4)`;
+        ctx.shadowBlur = 6 + Math.sin(flowOffset) * 2;
+        ctx.fillStyle = bodyGradient;
+        
+        if (isTail) {
+          // Tapered tail
+          ctx.beginPath();
+          ctx.roundRect(x + bodyOffset, y + bodyOffset, bodySize, bodySize, bodySize * 0.4);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.roundRect(x + bodyOffset, y + bodyOffset, bodySize, bodySize, 3);
+          ctx.fill();
+        }
+      }
+      
+      ctx.restore();
+    });
+  }, [snake, food, tile, dims]);
+
+  // Controls
+  const turn = useCallback((newDir: Dir) => {
+    setDir(currentDir => {
+      // Prevent 180-degree turns
+      if ((currentDir === "left" && newDir === "right") || 
+          (currentDir === "right" && newDir === "left") ||
+          (currentDir === "up" && newDir === "down") || 
+          (currentDir === "down" && newDir === "up")) {
+        return currentDir;
+      }
+      return newDir;
+    });
+  }, []);
 
   // Keyboard controls
   useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      if (!isPlaying) return;
-
+    const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
-        case 'ArrowUp':
-        case 'w':
+        case "ArrowUp":
+        case "w":
+        case "W":
           e.preventDefault();
-          setDirection(prev => prev !== DIRECTIONS.DOWN ? DIRECTIONS.UP : prev);
+          turn("up");
           break;
-        case 'ArrowDown':
-        case 's':
+        case "ArrowDown":
+        case "s":
+        case "S":
           e.preventDefault();
-          setDirection(prev => prev !== DIRECTIONS.UP ? DIRECTIONS.DOWN : prev);
+          turn("down");
           break;
-        case 'ArrowLeft':
-        case 'a':
+        case "ArrowLeft":
+        case "a":
+        case "A":
           e.preventDefault();
-          setDirection(prev => prev !== DIRECTIONS.RIGHT ? DIRECTIONS.LEFT : prev);
+          turn("left");
           break;
-        case 'ArrowRight':
-        case 'd':
+        case "ArrowRight":
+        case "d":
+        case "D":
           e.preventDefault();
-          setDirection(prev => prev !== DIRECTIONS.LEFT ? DIRECTIONS.RIGHT : prev);
+          turn("right");
           break;
-        case ' ':
+        case " ":
+        case "Enter":
           e.preventDefault();
-          setIsPlaying(prev => !prev);
+          setPaused(p => !p);
+          break;
+        case "r":
+        case "R":
+          e.preventDefault();
+          reset();
           break;
       }
     };
 
-    window.addEventListener('keydown', handleKeyPress);
-    return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [isPlaying]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [turn]);
+
+  // Touch controls
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    let startX = 0;
+    let startY = 0;
+    let isActive = false;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      isActive = true;
+      // Only prevent default for game touches, not general page interaction
+      if (e.target === canvas) {
+        e.preventDefault();
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isActive) return;
+      
+      // Only prevent default for canvas touches
+      if (e.target === canvas) {
+        e.preventDefault();
+      }
+      
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+      const threshold = 30;
+
+      if (Math.abs(deltaX) > threshold || Math.abs(deltaY) > threshold) {
+        if (Math.abs(deltaX) > Math.abs(deltaY)) {
+          turn(deltaX > 0 ? "right" : "left");
+        } else {
+          turn(deltaY > 0 ? "down" : "up");
+        }
+        isActive = false;
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      isActive = false;
+      // Only prevent default for canvas touches
+      if (e.target === canvas) {
+        e.preventDefault();
+      }
+    };
+
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: false });
+    canvas.addEventListener("touchmove", handleTouchMove, { passive: false });
+    canvas.addEventListener("touchend", handleTouchEnd, { passive: false });
+
+    return () => {
+      canvas.removeEventListener("touchstart", handleTouchStart);
+      canvas.removeEventListener("touchmove", handleTouchMove);
+      canvas.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [turn]);
+
+  const reset = () => {
+    setSnake([{ x: 4, y: 10 }, { x: 3, y: 10 }, { x: 2, y: 10 }]);
+    setFood({ x: 8, y: 10 });
+    setDir("right");
+    setScore(0);
+    setAlive(true);
+    setPaused(true);
+  };
+
+  const tipAmount = score * DOLLARS_PER_FOOD;
+
+  // This function is no longer used since we removed payment buttons from Snake game
+
+  const paymentMethods = [
+    { id: "stripe", name: "Card", icon: "💳", available: true },
+    { id: "cashapp", name: "Cash App", icon: "💵", available: !!worker.cashappHandle },
+    { id: "venmo", name: "Venmo", icon: "💜", available: !!worker.venmoHandle },
+    { id: "zelle", name: "Zelle", icon: "🏦", available: !!worker.zelleHandle }
+  ].filter(m => m.available);
 
   return (
-    <motion.div
+    <motion.div 
+      className={`bg-glass backdrop-blur-md border border-glass-border rounded-2xl p-4 ${className}`}
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className={className}
+      transition={{ duration: 0.4, ease: [0.4, 0.0, 0.2, 1] }}
     >
-      <GlassCard className="p-6">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-4">
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-white">Snake Tip Game</h3>
-            <p className="text-sm text-gray-300">Collect tip amounts to add to your total!</p>
+      {/* Header with game explanation */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="text-lg font-semibold text-text-primary">Play to Tip</h3>
+            <p className="text-sm text-text-secondary">Guide snake to collect $</p>
           </div>
-          <div className="text-right space-y-1">
-            <div className="text-lg font-bold text-green-400">${totalTips}</div>
-            <div className="text-xs text-gray-400">Total Tips</div>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-accent-start">${tipAmount}</div>
+            <div className="text-xs text-text-secondary flex items-center gap-1 justify-end">
+              {score >= 5 && <div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></div>}
+              {score >= 5 ? "Speed Boost!" : `${5 - score} more to boost`}
+            </div>
           </div>
         </div>
-
-        {/* Game Board */}
-        <div className="relative mx-auto mb-4" style={{ width: GRID_SIZE * CELL_SIZE, height: GRID_SIZE * CELL_SIZE }}>
-          <div 
-            className="relative border-2 border-white/20 rounded-lg overflow-hidden bg-black/20"
-            style={{ width: GRID_SIZE * CELL_SIZE, height: GRID_SIZE * CELL_SIZE }}
-          >
-            {/* Snake */}
-            <AnimatePresence>
-              {snake.map((segment, index) => (
-                <motion.div
-                  key={`snake-${index}`}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  exit={{ scale: 0 }}
-                  className={`absolute rounded-sm ${
-                    index === 0 
-                      ? 'bg-gradient-to-br from-green-400 to-emerald-500' 
-                      : 'bg-gradient-to-br from-green-500 to-green-600'
-                  }`}
-                  style={{
-                    left: segment.x * CELL_SIZE,
-                    top: segment.y * CELL_SIZE,
-                    width: CELL_SIZE - 1,
-                    height: CELL_SIZE - 1,
-                  }}
-                />
-              ))}
-            </AnimatePresence>
-
-            {/* Food */}
-            <motion.div
-              animate={{ 
-                scale: [1, 1.1, 1],
-                rotate: [0, 5, -5, 0]
-              }}
-              transition={{ 
-                duration: 0.8, 
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-              className="absolute bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg"
-              style={{
-                left: food.x * CELL_SIZE,
-                top: food.y * CELL_SIZE,
-                width: CELL_SIZE - 1,
-                height: CELL_SIZE - 1,
-              }}
-            >
-              ${food.amount}
-            </motion.div>
-          </div>
-
-          {/* Game Over Overlay */}
-          <AnimatePresence>
-            {gameOver && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="absolute inset-0 bg-black/70 rounded-lg flex flex-col items-center justify-center text-white"
-              >
-                <Trophy size={32} className="text-yellow-400 mb-2" />
-                <h4 className="text-lg font-bold mb-1">Game Over!</h4>
-                <p className="text-sm mb-3">You collected ${totalTips} in tips!</p>
-                <Button size="sm" onClick={resetGame} className="bg-green-600 hover:bg-green-700">
-                  <RotateCcw size={16} className="mr-1" />
-                  Play Again
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Controls */}
-        <div className="flex justify-center gap-3">
-          <Button
-            size="sm"
-            variant={isPlaying ? "destructive" : "default"}
-            onClick={() => setIsPlaying(!isPlaying)}
-            disabled={gameOver}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-            {isPlaying ? 'Pause' : 'Start'}
-          </Button>
-          <Button size="sm" variant="outline" onClick={resetGame} className="border-white/20 text-white hover:bg-white/10">
-            <RotateCcw size={16} className="mr-1" />
-            Reset
-          </Button>
-        </div>
-
-        {/* Instructions */}
-        <div className="mt-4 text-center">
-          <p className="text-xs text-gray-400">
-            Use arrow keys or WASD to move • Space to pause • Collect $ amounts to add to your tip!
+        
+        {/* Game explanation */}
+        <div className="bg-glass backdrop-blur-sm border border-glass-border rounded-lg p-3 mb-4">
+          <p className="text-sm text-text-secondary text-center">
+            🐍 Each <span className="text-green-400 font-semibold">$</span> collected = $1 tip • 
+            Speed increases after $5 • Use arrows or swipe to control
           </p>
         </div>
-      </GlassCard>
+      </div>
+
+      {/* Game Canvas */}
+      <motion.div 
+        className="relative mb-4"
+        initial={{ scale: 0.85, opacity: 0, y: 10 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        transition={{ 
+          duration: 0.5, 
+          delay: 0.1,
+          ease: [0.4, 0.0, 0.2, 1]
+        }}
+      >
+        <motion.canvas
+          ref={canvasRef}
+          className="border border-glass-border rounded-lg mx-auto block touch-none shadow-lg"
+          width={dims.cssW}
+          height={dims.cssH}
+          style={{ width: dims.cssW, height: dims.cssH, touchAction: 'none' }}
+          animate={gameActive ? {
+            boxShadow: [
+              "0 4px 20px rgba(139, 69, 255, 0.2)",
+              "0 4px 30px rgba(139, 69, 255, 0.4)",
+              "0 4px 20px rgba(139, 69, 255, 0.2)"
+            ]
+          } : {}}
+          transition={{
+            boxShadow: {
+              duration: 2.5,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }
+          }}
+        />
+      </motion.div>
+        
+        {/* Game overlay - only over the canvas */}
+        {(paused || !alive) && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              {!alive ? (
+                <>
+                  <div className="text-xl font-bold text-white mb-2">Game Over!</div>
+                  <div className="text-sm text-white/80 mb-4">Final Score: {score}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-xl font-bold text-white mb-2">
+                    {score === 0 ? "Ready to Earn Tips?" : "Game Paused"}
+                  </div>
+                  <div className="text-sm text-white/80 mb-4">
+                    {score === 0 ? "Swipe or use arrow keys to start" : tipAmount > 0 ? `$${tipAmount} earned so far!` : ""}
+                  </div>
+                </>
+              )}
+              <div className="flex gap-2 justify-center">
+                {!alive ? (
+                  <button
+                    onClick={reset}
+                    className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
+                  >
+                    Play Again
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => setPaused(false)}
+                      className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
+                    >
+                      {score === 0 ? "Start Earning" : "Resume"}
+                    </button>
+                    {tipAmount > 0 && (
+                      <button
+                        onClick={() => onTipEarned?.(tipAmount)}
+                        className="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-white font-medium transition-colors"
+                      >
+                        Tip ${tipAmount}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+      {/* Controls */}
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setPaused(!paused)}
+          disabled={!alive}
+          className="flex-1 py-2 px-4 bg-glass hover:bg-glass-border border border-glass-border rounded-lg text-sm font-medium text-text-primary transition-colors disabled:opacity-50"
+        >
+          {paused ? "Resume" : "Pause"}
+        </button>
+        <button
+          onClick={reset}
+          className="flex-1 py-2 px-4 bg-glass hover:bg-glass-border border border-glass-border rounded-lg text-sm font-medium text-text-primary transition-colors"
+        >
+          Reset
+        </button>
+      </div>
+
+      {/* Tip earned indicator */}
+      {tipAmount > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4"
+        >
+          <div className="text-center p-4 bg-gradient-to-r from-green-500/20 to-accent-start/20 rounded-lg border border-green-500/30">
+            <div className="text-lg font-semibold text-green-400 mb-1">
+              ${tipAmount} Earned! 🎉
+            </div>
+            <div className="text-sm text-text-secondary mb-3">
+              Tip amount will be used in payment flow
+            </div>
+            <button
+              onClick={() => onTipEarned?.(tipAmount)}
+              className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
+            >
+              Continue to Payment
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Game Status */}
+      <div className="mt-4 text-center">
+        {score >= 5 && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/20 border border-red-500/30 rounded-full mb-2">
+            <div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></div>
+            <span className="text-xs text-red-300 font-medium">SPEED BOOST ACTIVE</span>
+          </div>
+        )}
+        <div className="text-xs text-text-secondary">
+          Swipe or arrow keys to move • Space to pause • R to restart
+        </div>
+      </div>
+
+      {/* Zelle modal */}
+      <AnimatePresence>
+        {showZelle && (
+          <motion.div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowZelle(false)}
+          >
+            <motion.div
+              className="bg-glass backdrop-blur-md border border-glass-border rounded-2xl p-6 max-w-sm w-full"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-text-primary mb-4">Send via Zelle</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm text-text-secondary">Send to:</label>
+                  <div className="text-text-primary font-medium">{worker.zelleHandle}</div>
+                </div>
+                <div>
+                  <label className="text-sm text-text-secondary">Amount:</label>
+                  <div className="text-text-primary font-medium">${tipAmount}</div>
+                </div>
+                <div>
+                  <label className="text-sm text-text-secondary">Note:</label>
+                  <div className="text-text-primary">Snake tip game - {score} points</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowZelle(false)}
+                className="w-full mt-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
+              >
+                Got it
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
