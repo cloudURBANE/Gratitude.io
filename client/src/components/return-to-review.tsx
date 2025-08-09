@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { generateUniqueReview, generateReviewUrls } from "@/lib/review-generator";
+import { useToast } from "@/hooks/use-toast";
 
 interface ReturnToReviewProps {
   workerName: string;
   workerLocation?: string;
+  workerRole?: string;
   onReviewClick: (platform: 'google' | 'yelp' | 'wallet') => void;
   className?: string;
 }
@@ -11,11 +14,15 @@ interface ReturnToReviewProps {
 export default function ReturnToReview({ 
   workerName, 
   workerLocation, 
+  workerRole = "service professional",
   onReviewClick, 
   className = "" 
 }: ReturnToReviewProps) {
   const [showChips, setShowChips] = useState(false);
   const [hasShown, setHasShown] = useState(false);
+  const [showReviewText, setShowReviewText] = useState(false);
+  const [generatedReview, setGeneratedReview] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
     // Only show once per session
@@ -41,8 +48,43 @@ export default function ReturnToReview({
     };
   }, [hasShown]);
 
+  const handleGenerateReview = () => {
+    const review = generateUniqueReview({
+      name: workerName,
+      role: workerRole,
+      location: workerLocation || "local business"
+    });
+    setGeneratedReview(review);
+    setShowReviewText(true);
+  };
+
+  const handleCopyReview = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedReview);
+      toast({
+        title: "Review copied!",
+        description: "Paste it when you write your review",
+      });
+    } catch (err) {
+      toast({
+        title: "Copy failed",
+        description: "Please select and copy the text manually",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleChipClick = (platform: 'google' | 'yelp' | 'wallet') => {
-    onReviewClick(platform);
+    if (platform === 'google' || platform === 'yelp') {
+      const reviewUrls = generateReviewUrls({
+        name: workerName,
+        role: workerRole,
+        location: workerLocation || "local business"
+      });
+      window.open(reviewUrls[platform], '_blank');
+    } else {
+      onReviewClick(platform);
+    }
     setShowChips(false);
   };
 
@@ -58,14 +100,51 @@ export default function ReturnToReview({
         transition={{ duration: 0.4, ease: "easeOut" }}
       >
         <div className="bg-glass backdrop-blur-md border border-glass-border rounded-2xl p-4 shadow-2xl">
-          <motion.p
-            className="text-sm text-text-primary text-center mb-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-          >
-            Help {workerName} with a quick review?
-          </motion.p>
+          {!showReviewText ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <p className="text-sm text-text-primary text-center mb-3">
+                Help {workerName} with a quick review?
+              </p>
+              <motion.button
+                onClick={handleGenerateReview}
+                className="w-full bg-gradient-to-r from-accent-start to-accent-end text-white rounded-lg py-2 px-4 text-sm font-medium mb-3"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Generate Review Text
+              </motion.button>
+            </motion.div>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4"
+            >
+              <div className="bg-glass-interactive border border-glass-border rounded-lg p-3 mb-3">
+                <p className="text-sm text-text-primary leading-relaxed">
+                  {generatedReview}
+                </p>
+              </div>
+              <div className="flex justify-center gap-2 mb-3">
+                <button
+                  onClick={handleCopyReview}
+                  className="text-xs text-text-secondary hover:text-text-primary flex items-center gap-1"
+                >
+                  📋 Copy Review
+                </button>
+                <button
+                  onClick={handleGenerateReview}
+                  className="text-xs text-text-secondary hover:text-text-primary"
+                >
+                  🔄 Generate New
+                </button>
+              </div>
+            </motion.div>
+          )}
 
           <div className="flex gap-3">
             {/* Google chip */}

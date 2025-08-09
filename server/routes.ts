@@ -200,19 +200,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe payment intent creation
+  // Stripe payment intent creation with exact amount handling
   app.post("/api/create-payment-intent", async (req, res) => {
     try {
-      const { amount, workerId, note, customerName } = req.body;
+      const { amount, workerId, note, customerName, description } = req.body;
       
-      if (!amount || amount < 1) {
-        return res.status(400).json({ message: "Invalid amount" });
+      // Ensure amount is a valid number and convert to cents
+      const amountInCents = Math.round(parseFloat(amount) * 100);
+      
+      if (isNaN(amountInCents) || amountInCents < 50) { // Stripe minimum is 50 cents
+        return res.status(400).json({ 
+          message: "Invalid amount. Minimum is $0.50" 
+        });
       }
 
-      // Create Stripe payment intent
+      // Create Stripe payment intent with exact amount
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(amount * 100), // Convert to cents
+        amount: amountInCents,
         currency: "usd",
+        description: description || `Tip payment of $${(amountInCents / 100).toFixed(2)}`,
         automatic_payment_methods: {
           enabled: true,
         },
@@ -220,12 +226,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           workerId: workerId || 'demo-worker',
           note: note || '',
           customerName: customerName || 'Anonymous',
+          tip_amount: (amountInCents / 100).toFixed(2),
         },
       });
 
       res.json({ 
         clientSecret: paymentIntent.client_secret,
         paymentIntentId: paymentIntent.id,
+        amount: amountInCents / 100 // Return the exact amount for verification
       });
     } catch (error: any) {
       console.error("Stripe payment intent error:", error);

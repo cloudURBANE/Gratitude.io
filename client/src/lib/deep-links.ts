@@ -8,18 +8,18 @@ interface PaymentAppLinks {
 
 export const paymentAppLinks: PaymentAppLinks = {
   venmo: (handle: string, amount: number, note: string) => ({
-    deepLink: `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(handle.replace('@', ''))}&amount=${amount}&note=${encodeURIComponent(note)}`,
-    webFallback: `https://venmo.com/${encodeURIComponent(handle.replace('@', ''))}?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`
+    deepLink: `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(handle.replace('@', ''))}&amount=${amount.toFixed(2)}&note=${encodeURIComponent(note)}`,
+    webFallback: `https://venmo.com/u/${encodeURIComponent(handle.replace('@', ''))}?amount=${amount.toFixed(2)}&note=${encodeURIComponent(note)}`
   }),
   
   cashapp: (handle: string, amount: number) => ({
-    deepLink: `https://cash.app/$${encodeURIComponent(handle.replace('$', ''))}/${amount}`,
-    webFallback: `https://cash.app/$${encodeURIComponent(handle.replace('$', ''))}/${amount}`
+    deepLink: `cashapp://qr/${encodeURIComponent(handle.replace('$', ''))}?amount=${amount.toFixed(2)}`,
+    webFallback: `https://cash.app/$${encodeURIComponent(handle.replace('$', ''))}/${amount.toFixed(2)}`
   }),
   
   zelle: (handle: string, amount: number, note: string) => ({
-    deepLinks: [], // Zelle has no reliable deep links
-    fallback: `Send $${amount} to ${handle} using Zelle in your banking app`
+    deepLinks: [`zelle://transfer?recipient=${encodeURIComponent(handle)}&amount=${amount.toFixed(2)}&memo=${encodeURIComponent(note)}`],
+    fallback: `Send $${amount.toFixed(2)} to ${handle} using Zelle in your banking app`
   })
 };
 
