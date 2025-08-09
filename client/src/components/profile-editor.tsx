@@ -5,54 +5,52 @@ import { useToast } from "@/hooks/use-toast";
 import GlassCard from "./glass-card";
 import GradientButton from "./gradient-button";
 
-interface Worker {
-  id: string;
-  name: string;
-  role: string;
-  location?: string;
-  handle: string;
-  avatarUrl?: string;
-  venmoHandle?: string;
-  cashappHandle?: string;
-  zelleInfo?: string;
-  stripeAccountId?: string;
-  googleReviewUrl?: string;
-  yelpReviewUrl?: string;
-}
-
 interface ProfileEditorProps {
-  worker: Worker;
+  worker: {
+    id: string;
+    name: string;
+    role: string;
+    location: string;
+    handle: string;
+    avatarUrl?: string;
+    venmoHandle?: string;
+    cashappHandle?: string;
+    zelleHandle?: string;
+    googleReviewUrl?: string;
+    yelpReviewUrl?: string;
+  };
   onClose: () => void;
 }
 
 export default function ProfileEditor({ worker, onClose }: ProfileEditorProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
+  
   const [formData, setFormData] = useState({
     name: worker.name || '',
     role: worker.role || '',
     location: worker.location || '',
+    avatarUrl: worker.avatarUrl || '',
     venmoHandle: worker.venmoHandle || '',
     cashappHandle: worker.cashappHandle || '',
-    zelleInfo: worker.zelleInfo || '',
+    zelleHandle: worker.zelleHandle || '',
     googleReviewUrl: worker.googleReviewUrl || '',
     yelpReviewUrl: worker.yelpReviewUrl || '',
   });
 
   const updateWorkerMutation = useMutation({
-    mutationFn: async (updateData: any) => {
-      return await apiRequest("PUT", `/api/workers/${worker.id}`, updateData);
+    mutationFn: async (data: any) => {
+      return await apiRequest("PUT", `/api/workers/${worker.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/workers", worker.handle] });
+      queryClient.invalidateQueries({ queryKey: ["/api/workers"] });
       toast({
-        title: "Profile updated",
-        description: "Your profile has been saved successfully.",
+        title: "Profile updated!",
+        description: "Your changes have been saved.",
       });
       onClose();
     },
-    onError: () => {
+    onError: (error) => {
       toast({
         title: "Error",
         description: "Failed to update profile. Please try again.",
@@ -61,184 +59,186 @@ export default function ProfileEditor({ worker, onClose }: ProfileEditorProps) {
     },
   });
 
+  const handleChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateWorkerMutation.mutate(formData);
   };
 
-  const handleInputChange = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: e.target.value
-    }));
-  };
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      onClose();
-    }
-  };
-
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 modal-backdrop z-50 flex items-center justify-center p-4"
-      onClick={handleBackdropClick}
-      onKeyDown={handleKeyDown}
-      tabIndex={-1}
-    >
-      <GlassCard className="rounded-2xl p-6 w-full max-w-md max-h-screen overflow-y-auto no-scrollbar">
-        {/* Modal Header */}
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <GlassCard className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-semibold text-text-primary">Edit Profile</h2>
-          <button 
+          <h2 className="text-2xl font-bold text-text-primary">Edit Profile</h2>
+          <button
             onClick={onClose}
-            className="p-2 hover:bg-glass rounded-lg transition-colors focus-visible"
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-glass-border transition-colors"
           >
-            <svg className="w-6 h-6 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
           </button>
         </div>
 
-        {/* Profile Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Avatar Display */}
-          <div className="text-center">
-            <img 
-              src={worker.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150'} 
-              alt="Profile avatar" 
-              className="w-20 h-20 rounded-full mx-auto mb-4 object-cover border-2 border-glass-border" 
-            />
-            <button 
-              type="button"
-              className="text-sm text-accent-start hover:text-accent-end transition-colors focus-visible"
-            >
-              Change photo
-            </button>
-          </div>
-
           {/* Basic Info */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">Name</label>
-            <input 
-              type="text" 
-              className="w-full bg-transparent border border-glass-border rounded-lg py-3 px-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
-              value={formData.name}
-              onChange={handleInputChange('name')}
-              required
-            />
-          </div>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-text-primary">Basic Information</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="Your name"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">Role</label>
-            <input 
-              type="text" 
-              className="w-full bg-transparent border border-glass-border rounded-lg py-3 px-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
-              value={formData.role}
-              onChange={handleInputChange('role')}
-              required
-            />
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Role/Title
+                </label>
+                <input
+                  type="text"
+                  value={formData.role}
+                  onChange={(e) => handleChange('role', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="e.g., Server, Barista"
+                />
+              </div>
 
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-2">Location</label>
-            <input 
-              type="text" 
-              className="w-full bg-transparent border border-glass-border rounded-lg py-3 px-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
-              value={formData.location}
-              onChange={handleInputChange('location')}
-              placeholder="City, State"
-            />
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Location
+                </label>
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) => handleChange('location', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="Restaurant name or location"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Avatar URL
+                </label>
+                <input
+                  type="url"
+                  value={formData.avatarUrl}
+                  onChange={(e) => handleChange('avatarUrl', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="https://example.com/photo.jpg"
+                />
+              </div>
+            </div>
           </div>
 
           {/* Payment Methods */}
-          <div>
-            <h3 className="text-lg font-medium text-text-primary mb-4">Payment Methods</h3>
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-text-primary">Payment Methods</h3>
             
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Venmo Handle</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary">@</span>
-                  <input 
-                    type="text" 
-                    className="w-full bg-transparent border border-glass-border rounded-lg py-3 pl-8 pr-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
-                    value={formData.venmoHandle}
-                    onChange={handleInputChange('venmoHandle')}
-                    placeholder="username"
-                  />
-                </div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Venmo Handle
+                </label>
+                <input
+                  type="text"
+                  value={formData.venmoHandle}
+                  onChange={(e) => handleChange('venmoHandle', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="@username"
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Cash App Cashtag</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-text-secondary">$</span>
-                  <input 
-                    type="text" 
-                    className="w-full bg-transparent border border-glass-border rounded-lg py-3 pl-8 pr-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
-                    value={formData.cashappHandle}
-                    onChange={handleInputChange('cashappHandle')}
-                    placeholder="username"
-                  />
-                </div>
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Cash App Handle
+                </label>
+                <input
+                  type="text"
+                  value={formData.cashappHandle}
+                  onChange={(e) => handleChange('cashappHandle', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="$username"
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Zelle Email/Phone</label>
-                <input 
-                  type="text" 
-                  className="w-full bg-transparent border border-glass-border rounded-lg py-3 px-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
-                  value={formData.zelleInfo}
-                  onChange={handleInputChange('zelleInfo')}
-                  placeholder="email@example.com or phone"
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Zelle Email/Phone
+                </label>
+                <input
+                  type="text"
+                  value={formData.zelleHandle}
+                  onChange={(e) => handleChange('zelleHandle', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="email@example.com"
                 />
               </div>
             </div>
           </div>
 
           {/* Review Links */}
-          <div>
-            <h3 className="text-lg font-medium text-text-primary mb-4">Review Links</h3>
-            <div className="space-y-4">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-text-primary">Review Links</h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Google Reviews</label>
-                <input 
-                  type="url" 
-                  className="w-full bg-transparent border border-glass-border rounded-lg py-3 px-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Google Review URL
+                </label>
+                <input
+                  type="url"
                   value={formData.googleReviewUrl}
-                  onChange={handleInputChange('googleReviewUrl')}
-                  placeholder="https://g.page/..."
+                  onChange={(e) => handleChange('googleReviewUrl', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="https://g.page/r/..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-text-secondary mb-2">Yelp Reviews</label>
-                <input 
-                  type="url" 
-                  className="w-full bg-transparent border border-glass-border rounded-lg py-3 px-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20" 
+                <label className="block text-sm font-medium text-text-secondary mb-2">
+                  Yelp Review URL
+                </label>
+                <input
+                  type="url"
                   value={formData.yelpReviewUrl}
-                  onChange={handleInputChange('yelpReviewUrl')}
-                  placeholder="https://yelp.com/..."
+                  onChange={(e) => handleChange('yelpReviewUrl', e.target.value)}
+                  className="w-full px-4 py-3 bg-glass border border-glass-border rounded-lg text-text-primary focus:ring-2 focus:ring-accent-start focus:border-transparent transition-all"
+                  placeholder="https://www.yelp.com/writeareview/biz/..."
                 />
               </div>
             </div>
           </div>
 
-          {/* Save Button */}
-          <GradientButton
-            type="submit"
-            className="w-full py-3"
-            disabled={updateWorkerMutation.isPending}
-          >
-            {updateWorkerMutation.isPending ? 'Saving...' : 'Save Changes'}
-          </GradientButton>
+          <div className="flex gap-4 pt-4">
+            <GradientButton 
+              type="submit"
+              className="flex-1 py-3"
+              disabled={updateWorkerMutation.isPending}
+            >
+              {updateWorkerMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </GradientButton>
+            
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 px-6 bg-glass hover:bg-glass-border border border-glass-border rounded-lg text-text-primary transition-all"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       </GlassCard>
     </div>

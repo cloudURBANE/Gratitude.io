@@ -209,34 +209,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid amount" });
       }
 
-      // Create tip record first
-      const tip = await storage.createTip({
-        workerId,
-        amount: amount.toString(),
-        paymentMethod: 'stripe',
-        customerName: customerName || null,
-        note: note || null,
-        status: 'pending',
-      });
-
       // Create Stripe payment intent
       const paymentIntent = await stripe.paymentIntents.create({
         amount: Math.round(amount * 100), // Convert to cents
         currency: "usd",
+        automatic_payment_methods: {
+          enabled: true,
+        },
         metadata: {
-          tipId: tip.id,
-          workerId,
+          workerId: workerId || 'demo-worker',
+          note: note || '',
+          customerName: customerName || 'Anonymous',
         },
       });
 
-      // Update tip with payment intent ID
-      await storage.updateTipStatus(tip.id, 'pending', paymentIntent.id);
-
       res.json({ 
         clientSecret: paymentIntent.client_secret,
-        tipId: tip.id,
+        paymentIntentId: paymentIntent.id,
       });
     } catch (error: any) {
+      console.error("Stripe payment intent error:", error);
       res.status(500).json({ message: "Error creating payment intent: " + error.message });
     }
   });

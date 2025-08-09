@@ -1,160 +1,190 @@
-import { useStripe, Elements, PaymentElement, useElements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
 import { useEffect, useState } from 'react';
-import { useParams, useLocation } from 'wouter';
+import { useLocation, useRoute } from 'wouter';
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import GlassCard from "@/components/glass-card";
-import GradientButton from "@/components/gradient-button";
+import GlassCard from '@/components/glass-card';
+import GradientButton from '@/components/gradient-button';
 
-// Make sure to call `loadStripe` outside of a component's render to avoid
-// recreating the `Stripe` object on every render.
-if (!import.meta.env.VITE_STRIPE_PUBLIC_KEY) {
-  throw new Error('Missing required Stripe key: VITE_STRIPE_PUBLIC_KEY');
-}
+// Initialize Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 const CheckoutForm = ({ amount, workerId, note }: { amount: number; workerId: string; note: string }) => {
   const stripe = useStripe();
   const elements = useElements();
-  const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setLocation] = useLocation();
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!stripe || !elements) {
       return;
     }
 
-    setIsLoading(true);
+    setIsProcessing(true);
 
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/success`,
-      },
-    });
+    try {
+      const { error, paymentIntent } = await stripe.confirmPayment({
+        elements,
+        confirmParams: {
+          return_url: `${window.location.origin}/success`,
+        },
+        redirect: 'if_required',
+      });
 
-    if (error) {
+      if (error) {
+        console.error('Payment failed:', error);
+        toast({
+          title: "Payment Failed",
+          description: error.message || "Something went wrong. Please try again.",
+          variant: "destructive",
+        });
+      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        // Record the successful tip
+        await apiRequest("POST", "/api/tips", {
+          workerId,
+          amount: amount.toString(),
+          paymentMethod: 'stripe',
+          note,
+          paymentIntentId: paymentIntent.id,
+        });
+
+        toast({
+          title: "Payment Successful!",
+          description: "Your tip has been sent successfully.",
+        });
+        
+        setLocation('/success');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
       toast({
-        title: "Payment Failed",
-        description: error.message,
+        title: "Payment Error",
+        description: "Something went wrong. Please try again.",
         variant: "destructive",
       });
-      setIsLoading(false);
-    } else {
-      toast({
-        title: "Payment Successful",
-        description: "Thank you for your tip!",
-      });
-      setLocation('/success');
     }
+
+    setIsProcessing(false);
   };
 
   return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-      <div className="max-w-md mx-auto px-4 w-full">
-        <GlassCard className="rounded-2xl p-6">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-text-primary mb-2">Complete Your Tip</h1>
-            <p className="text-text-secondary">Secure payment powered by Stripe</p>
-            <div className="text-3xl font-bold text-accent-start mt-4">${amount}</div>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="p-4 glass-card rounded-xl">
-              <PaymentElement 
-                options={{
-                  layout: 'tabs',
-                  paymentMethodOrder: ['card', 'apple_pay', 'google_pay']
-                }}
-              />
-            </div>
-
-            {note && (
-              <GlassCard className="p-4 rounded-xl">
-                <p className="text-sm text-text-secondary mb-1">Your note:</p>
-                <p className="text-text-primary">{note}</p>
-              </GlassCard>
-            )}
-
-            <GradientButton
-              type="submit"
-              className="w-full py-4 text-lg"
-              disabled={!stripe || isLoading}
-            >
-              {isLoading ? 'Processing...' : `Send $${amount} Tip`}
-            </GradientButton>
-          </form>
-
-          <div className="text-center mt-4">
-            <button 
-              onClick={() => window.history.back()}
-              className="text-text-secondary hover:text-text-primary transition-colors text-sm"
-            >
-              ← Back to tip page
-            </button>
-          </div>
-        </GlassCard>
+    <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4">
+      {/* Background decorative elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-32 h-32 bg-accent-start rounded-full filter blur-3xl opacity-10 animate-float"></div>
+        <div className="absolute bottom-20 right-10 w-40 h-40 bg-accent-end rounded-full filter blur-3xl opacity-10 animate-float" style={{ animationDelay: '-3s' }}></div>
       </div>
+
+      <GlassCard className="w-full max-w-md p-6 relative z-10">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-text-primary mb-2">Complete Your Tip</h1>
+          <div className="text-3xl font-bold text-accent-start mb-1">${amount.toFixed(2)}</div>
+          {note && <p className="text-text-secondary text-sm">{note}</p>}
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <PaymentElement />
+          
+          <GradientButton 
+            type="submit" 
+            className="w-full py-3"
+            disabled={!stripe || isProcessing}
+          >
+            {isProcessing ? 'Processing...' : `Send $${amount.toFixed(2)} Tip`}
+          </GradientButton>
+
+          <button
+            type="button"
+            onClick={() => setLocation(-1)}
+            className="w-full py-2 text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Back
+          </button>
+        </form>
+      </GlassCard>
     </div>
   );
 };
 
 export default function Checkout() {
-  const { handle } = useParams<{ handle: string }>();
-  const [location] = useLocation();
-  const [clientSecret, setClientSecret] = useState("");
-  const [amount, setAmount] = useState(0);
-  const [note, setNote] = useState("");
-  const [workerId, setWorkerId] = useState("");
+  const [match, params] = useRoute('/u/:handle/checkout');
+  const [clientSecret, setClientSecret] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+
+  // Get URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const amount = parseFloat(urlParams.get('amount') || '0');
+  const note = urlParams.get('note') || '';
+  const workerId = params?.handle || 'demo';
 
   useEffect(() => {
-    // Parse URL parameters
-    const params = new URLSearchParams(window.location.search);
-    const amountParam = params.get('amount');
-    const noteParam = params.get('note');
-
-    if (!amountParam) {
-      window.location.href = `/u/${handle}`;
+    if (!amount || amount <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please select a tip amount first.",
+        variant: "destructive",
+      });
       return;
     }
 
-    const parsedAmount = parseFloat(amountParam);
-    setAmount(parsedAmount);
-    setNote(noteParam || '');
-
-    // Create PaymentIntent as soon as the page loads
-    const createPaymentIntent = async () => {
-      try {
-        const response = await apiRequest("POST", "/api/create-payment-intent", { 
-          amount: parsedAmount,
-          workerId: handle, // Using handle as workerId for demo
-          note: noteParam || '',
-          customerName: '' // Could be collected in a form
-        });
-        const data = await response.json();
+    // Create payment intent
+    apiRequest("POST", "/api/create-payment-intent", {
+      amount,
+      workerId,
+      note,
+    })
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.clientSecret) {
         setClientSecret(data.clientSecret);
-        setWorkerId(handle || '');
-      } catch (error) {
-        console.error('Failed to create payment intent:', error);
+      } else {
+        throw new Error(data.message || 'Failed to create payment intent');
       }
-    };
+    })
+    .catch((error) => {
+      console.error('Error creating payment intent:', error);
+      toast({
+        title: "Payment Setup Failed",
+        description: "Unable to setup payment. Please try again.",
+        variant: "destructive",
+      });
+    })
+    .finally(() => {
+      setIsLoading(false);
+    });
+  }, [amount, workerId, note, toast]);
 
-    createPaymentIntent();
-  }, [handle]);
+  if (!match) {
+    return <div>Not found</div>;
+  }
 
-  if (!clientSecret) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-dark-bg flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" aria-label="Loading"/>
+        <div className="animate-spin w-8 h-8 border-4 border-accent-start border-t-transparent rounded-full" />
       </div>
     );
   }
 
-  // Make SURE to wrap the form in <Elements> which provides the stripe context.
+  if (!clientSecret) {
+    return (
+      <div className="min-h-screen bg-dark-bg flex items-center justify-center p-4">
+        <GlassCard className="p-8 text-center max-w-md mx-4">
+          <h1 className="text-2xl font-bold text-text-primary mb-4">Payment Setup Failed</h1>
+          <p className="text-text-secondary mb-6">Unable to setup payment. Please try again.</p>
+          <GradientButton onClick={() => window.history.back()}>
+            Go Back
+          </GradientButton>
+        </GlassCard>
+      </div>
+    );
+  }
+
   return (
     <Elements stripe={stripePromise} options={{ clientSecret }}>
       <CheckoutForm amount={amount} workerId={workerId} note={note} />
