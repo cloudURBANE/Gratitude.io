@@ -74,11 +74,12 @@ export default function TipPage() {
 
   // Track QR scan when worker data is loaded
   useEffect(() => {
-    if (worker?.id) {
+    const currentWorker = handle === 'demo' ? demoWorker : workerData;
+    if (currentWorker?.id) {
       const recordScan = async () => {
         try {
           await apiRequest("POST", "/api/qr-scans", {
-            workerId: worker.id,
+            workerId: currentWorker.id,
           });
         } catch (error) {
           console.error("Failed to record QR scan:", error);
@@ -86,7 +87,7 @@ export default function TipPage() {
       };
       recordScan();
     }
-  }, [worker?.id]);
+  }, [handle, workerData]);
 
   const createTipMutation = useMutation({
     mutationFn: async (tipData: any) => {
