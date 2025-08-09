@@ -44,6 +44,34 @@ export default function TipPage() {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+  // Demo data for when handle is 'demo'
+  const demoWorker: Worker = {
+    id: 'demo-id',
+    name: 'Jordan M.',
+    role: 'Barista & Shift Lead',
+    location: 'Seattle, WA',
+    handle: 'demo',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150',
+    venmoHandle: 'jordan-coffee',
+    cashappHandle: 'jordanbarista',
+    zelleInfo: 'jordan@coffee.com',
+    stripeAccountId: 'demo-stripe',
+    googleReviewUrl: 'https://g.page/demo',
+    yelpReviewUrl: 'https://yelp.com/demo',
+    todayStats: {
+      totalTips: 8,
+      totalAmount: '94.00',
+      avgAmount: '11.75',
+    },
+  };
+
+  const { data: workerData, isLoading, error } = useQuery<Worker>({
+    queryKey: ["/api/workers", handle],
+    enabled: !!handle && handle !== 'demo',
+  });
+
+  const worker = handle === 'demo' ? demoWorker : workerData;
+
   // Track QR scan when worker data is loaded
   useEffect(() => {
     if (worker?.id) {
@@ -59,33 +87,6 @@ export default function TipPage() {
       recordScan();
     }
   }, [worker?.id]);
-
-  const { data: workerData, isLoading, error } = useQuery<Worker>({
-    queryKey: ["/api/workers", handle],
-    enabled: !!handle && handle !== 'demo',
-  });
-
-  const worker = handle === 'demo' ? demoWorker : workerData;
-
-  // Demo data for when handle is 'demo'
-  const demoWorker: Worker = {
-    id: 'demo-id',
-    name: 'Jordan M.',
-    role: 'Barista & Shift Lead',
-    location: 'Seattle, WA',
-    handle: 'demo',
-    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150',
-    venmoHandle: 'jordan-coffee',
-    cashappHandle: 'jordanbarista',
-    zelleInfo: 'jordan@coffee.com',
-    googleReviewUrl: 'https://g.page/demo',
-    yelpReviewUrl: 'https://yelp.com/demo',
-    todayStats: {
-      totalTips: 12,
-      totalAmount: '156.00',
-      avgAmount: '13.00',
-    },
-  };
 
   const createTipMutation = useMutation({
     mutationFn: async (tipData: any) => {

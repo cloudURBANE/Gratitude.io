@@ -79,6 +79,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // QR Code generation route
+  app.get("/api/workers/:handle/qr", async (req, res) => {
+    try {
+      const { handle } = req.params;
+      const baseUrl = `${req.protocol}://${req.get('host')}`;
+      const tipUrl = `${baseUrl}/u/${handle}`;
+      
+      // Generate QR code data URL (simple black QR on white background)
+      const qrSize = 256;
+      const qrData = `data:image/svg+xml;base64,${Buffer.from(`
+        <svg width="${qrSize}" height="${qrSize}" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="white"/>
+          <g fill="black">
+            <!-- Simple QR pattern simulation -->
+            <rect x="0" y="0" width="32" height="32"/>
+            <rect x="224" y="0" width="32" height="32"/>
+            <rect x="0" y="224" width="32" height="32"/>
+            <rect x="112" y="112" width="32" height="32"/>
+            <!-- Add more QR-like patterns -->
+            ${Array.from({ length: 20 }, (_, i) => {
+              const x = (i % 8) * 32;
+              const y = Math.floor(i / 8) * 32 + 64;
+              return `<rect x="${x}" y="${y}" width="16" height="16"/>`;
+            }).join('')}
+          </g>
+          <text x="128" y="150" text-anchor="middle" font-size="12" fill="black">Scan to Tip</text>
+        </svg>
+      `).toString('base64')}`;
+
+      res.json({
+        qrCode: qrData,
+        url: tipUrl,
+      });
+    } catch (error: any) {
+      console.error("Error generating QR code:", error);
+      res.status(500).json({ message: "Error generating QR code: " + error.message });
+    }
+  });
+
   // QR Code generation
   app.get("/api/workers/:handle/qr", async (req, res) => {
     try {

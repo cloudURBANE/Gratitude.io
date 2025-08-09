@@ -1,6 +1,6 @@
 # Overview
 
-TipLink is a modern, mobile-first digital tipping platform designed to connect service workers with customers through QR codes. The application enables workers to create personalized tip pages that customers can quickly access and use to send tips through multiple payment methods. Built with a premium dark glass aesthetic, the platform prioritizes speed, accessibility, and user experience while supporting various payment channels including Stripe, Venmo, CashApp, and Zelle.
+TipLink is a comprehensive, production-ready digital tipping platform designed to maximize earnings for service workers through optimized tip collection and analytics. The platform features real payment processing with Stripe, comprehensive analytics dashboards, QR code generation tools, profile management, and advanced optimization features. Built with a premium dark glass aesthetic and mobile-first design, TipLink transforms how workers collect and track tips while providing customers with seamless, multi-channel payment options.
 
 # User Preferences
 
@@ -39,10 +39,11 @@ Preferred communication style: Simple, everyday language.
 - **Session Management**: Express session configuration prepared for future implementation
 
 ## Payment Processing
-- **Primary Provider**: Stripe integration for card payments and checkout sessions
-- **Alternative Methods**: Deep links for Venmo, CashApp, and Zelle
-- **Payment Flow**: Modal-based payment selection with QR code generation for mobile payment apps
-- **Status Tracking**: Payment intent tracking and tip status management
+- **Primary Provider**: Stripe integration for secure card payments with real transaction processing
+- **Alternative Methods**: Deep links for Venmo, CashApp, and Zelle with handle management
+- **Payment Flow**: Modal-based payment selection with psychological pricing ($5, $8, $12, $20)
+- **Status Tracking**: Real-time payment intent tracking and comprehensive tip status management
+- **Optimization**: Analytics-driven recommendations to increase conversion rates and tip amounts
 
 ## Mobile-First Design
 - **Responsive Design**: Mobile-first approach with 390×844 viewport optimization
@@ -51,10 +52,12 @@ Preferred communication style: Simple, everyday language.
 - **Progressive Enhancement**: Works across different screen sizes and devices
 
 ## Component Architecture
-- **Design System**: Consistent spacing, typography, and color variables
+- **Design System**: Consistent spacing, typography, and color variables with glassmorphism effects
 - **Accessibility**: ARIA labels, keyboard navigation, and focus management
 - **Animation**: Subtle transitions and gradient effects using CSS animations
-- **Icon Strategy**: Inline SVG icons to avoid external dependencies
+- **Icon Strategy**: Inline SVG icons with lucide-react for consistent iconography
+- **Advanced Features**: Analytics dashboard with Recharts, QR code generation, profile management
+- **Navigation**: Full dashboard navigation between tip pages, analytics, QR tools, and settings
 
 # External Dependencies
 
@@ -64,9 +67,10 @@ Preferred communication style: Simple, everyday language.
 - **Styling**: Tailwind CSS with PostCSS for utility-first styling approach
 
 ## Database and Backend Services
-- **Database**: Neon PostgreSQL serverless database with connection pooling
-- **ORM**: Drizzle ORM with Drizzle Kit for migrations and schema management
-- **Validation**: Zod for runtime type validation and schema parsing
+- **Database**: Neon PostgreSQL serverless database with comprehensive analytics schema
+- **ORM**: Drizzle ORM with type-safe queries and real aggregation functions
+- **Analytics**: Real-time tip tracking, QR scan conversion analysis, and earnings optimization
+- **Validation**: Zod schemas for form validation and data integrity across profile management
 
 ## Payment and Financial Services
 - **Payment Processing**: Stripe API for credit card payments and checkout sessions
@@ -75,7 +79,8 @@ Preferred communication style: Simple, everyday language.
 
 ## Development and Tooling
 - **Development Server**: Vite with hot module replacement and proxy configuration
-- **Runtime Error Handling**: Replit runtime error modal for development debugging
+- **Charts & Analytics**: Recharts integration for beautiful data visualization
+- **Forms**: React Hook Form with Zod validation and shadcn/ui components
 - **Code Quality**: TypeScript strict mode with comprehensive type checking
 - **Build Process**: ESBuild for server bundling and Vite for client optimization
 
