@@ -9,6 +9,7 @@ import QuickTip from "@/components/quick-tip";
 import PaymentDock from "@/components/payment-dock";
 import SnakeGame from "@/components/snake-game";
 import { buildPayUrl, defaultPayMethod, type PayMethod } from "@/lib/snake-pay";
+import PaymentLauncher from "@/lib/payment-launcher";
 
 interface Worker {
   id: string;
@@ -193,29 +194,42 @@ export default function TipFlow() {
         return;
       }
       
-      try {
-        window.location.href = payUrl;
-        
-        // If user returns quickly (app failed to open), show fallback
-        setTimeout(() => {
-          if (!document.hidden) {
-            toast({
-              title: "Open Payment App",
-              description: `Tap to open ${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'}`,
-              action: (
-                <button
-                  onClick={() => payUrl && window.open(payUrl, '_blank')}
-                  className="px-3 py-1 bg-accent-start text-white rounded text-sm"
-                >
-                  Try Again
-                </button>
-              )
-            });
-            setRedirecting(false);
-          }
-        }, 3000);
-      } catch (error) {
-        console.error('Payment redirect failed:', error);
+      // Use comprehensive payment launcher
+      const launcher = PaymentLauncher.getInstance();
+      
+      const success = await launcher.launchPaymentApp({
+        method: method as 'venmo' | 'cashapp' | 'zelle',
+        amount: selectedAmount,
+        handle: method === 'venmo' ? worker.venmoHandle :
+                method === 'cashapp' ? worker.cashappHandle :
+                worker.zelleHandle || worker.zelleEmail,
+        email: worker.zelleEmail,
+        workerName: worker.name,
+        onStatusUpdate: (status) => {
+          console.log('Payment status:', status);
+        },
+        onFallback: (fallbackUrl) => {
+          toast({
+            title: "Payment App",
+            description: `Opening ${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'} - if it doesn't work, try the web version`,
+            action: (
+              <button
+                onClick={() => window.open(fallbackUrl, '_blank')}
+                className="px-3 py-1 bg-accent-start text-white rounded text-sm"
+              >
+                Web Version
+              </button>
+            )
+          });
+        }
+      });
+
+      if (!success) {
+        toast({
+          title: "App Not Available",
+          description: `${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'} app couldn't be opened. Try installing the app or use another method.`,
+          variant: "destructive",
+        });
         setRedirecting(false);
       }
     }
@@ -294,6 +308,7 @@ export default function TipFlow() {
           animate={{
             width: currentStep === "amount" ? "20%" :
                   currentStep === "payment" ? "40%" :
+                  redirecting ? "60%" :
                   currentStep === "processing" ? "70%" :
                   currentStep === "review" ? "85%" :
                   "100%"

@@ -540,60 +540,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
 
   const tipAmount = score * DOLLARS_PER_FOOD;
 
-  const handlePayNow = () => {
-    if (tipAmount === 0) {
-      toast({
-        title: "Play to earn tips!",
-        description: "Eat some food in the game first.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (method === "zelle") {
-      setShowZelle(true);
-      return;
-    }
-
-    const payUrl = buildPayUrl({
-      method,
-      handles: {
-        cashAppHandle: worker.cashappHandle,
-        venmoHandle: worker.venmoHandle,
-        zelleHandle: worker.zelleHandle,
-        stripeLink: "/api/create-payment-intent"
-      },
-      amount: tipAmount,
-      note: `Snake tip game - ${score} points`
-    });
-
-    if (method === "stripe") {
-      // Use existing Stripe flow
-      onTipEarned(tipAmount, method);
-      return;
-    }
-
-    if (payUrl) {
-      // Save for memory system
-      try {
-        localStorage.setItem(`tiplink-snake:last`, JSON.stringify({ 
-          amount: tipAmount, 
-          method, 
-          score 
-        }));
-      } catch (e) {
-        console.warn('Failed to save snake game data:', e);
-      }
-
-      window.location.href = payUrl;
-    } else {
-      toast({
-        title: "Payment method unavailable",
-        description: "Please try a different payment method.",
-        variant: "destructive"
-      });
-    }
-  };
+  // This function is no longer used since we removed payment buttons from Snake game
 
   const paymentMethods = [
     { id: "stripe", name: "Card", icon: "💳", available: true },
@@ -668,52 +615,55 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
         />
       </motion.div>
         
-        {/* Game overlay */}
-        <AnimatePresence>
-          {(paused || !alive) && (
-            <motion.div
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <div className="text-center">
+        {/* Game overlay - only over the canvas */}
+        {(paused || !alive) && (
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm rounded-lg flex items-center justify-center z-10">
+            <div className="text-center">
+              {!alive ? (
+                <>
+                  <div className="text-xl font-bold text-white mb-2">Game Over!</div>
+                  <div className="text-sm text-white/80 mb-4">Final Score: {score}</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-xl font-bold text-white mb-2">
+                    {score === 0 ? "Ready to Earn Tips?" : "Game Paused"}
+                  </div>
+                  <div className="text-sm text-white/80 mb-4">
+                    {score === 0 ? "Swipe or use arrow keys to start" : tipAmount > 0 ? `$${tipAmount} earned so far!` : ""}
+                  </div>
+                </>
+              )}
+              <div className="flex gap-2 justify-center">
                 {!alive ? (
-                  <>
-                    <div className="text-xl font-bold text-white mb-2">Game Over!</div>
-                    <div className="text-sm text-white/80 mb-4">Final Score: {score}</div>
-                  </>
+                  <button
+                    onClick={reset}
+                    className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
+                  >
+                    Play Again
+                  </button>
                 ) : (
                   <>
-                    <div className="text-xl font-bold text-white mb-2">
-                      {score === 0 ? "Ready to Earn Tips?" : "Game Paused"}
-                    </div>
-                    <div className="text-sm text-white/80 mb-4">
-                      {score === 0 ? "Swipe or use arrow keys to start" : ""}
-                    </div>
-                  </>
-                )}
-                <div className="flex gap-2 justify-center">
-                  {!alive ? (
-                    <button
-                      onClick={reset}
-                      className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
-                    >
-                      Play Again
-                    </button>
-                  ) : (
                     <button
                       onClick={() => setPaused(false)}
                       className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
                     >
                       {score === 0 ? "Start Earning" : "Resume"}
                     </button>
-                  )}
-                </div>
+                    {tipAmount > 0 && (
+                      <button
+                        onClick={() => onTipEarned?.(tipAmount)}
+                        className="px-4 py-2 bg-green-500 hover:bg-green-600 rounded-lg text-white font-medium transition-colors"
+                      >
+                        Tip ${tipAmount}
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+          </div>
+        )}
 
       {/* Controls */}
       <div className="flex gap-2 mb-4">
@@ -747,7 +697,7 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
               Tip amount will be used in payment flow
             </div>
             <button
-              onClick={() => onTipEarned(tipAmount)}
+              onClick={() => onTipEarned?.(tipAmount)}
               className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
             >
               Continue to Payment
