@@ -1,0 +1,57 @@
+Goal: Design v1 of a universal tip page (“TipLink”) that any tipped worker can QR people to. Prioritize mobile-first, fast, beautiful, and friction-free.
+
+Stack (for UI scaffolding): Next.js (or Vite + React) + Tailwind CSS. No backend logic yet—stub actions.
+
+Design system (dark glass):
+	•	Palette: near-black background #0B0B0F, card glass rgba(255,255,255,0.06), text #ECECEC, accent gradient (animated) from #7C3AED → #22D3EE.
+	•	Type: Inter or SF. Sizes: 18/24/32 scale with 1.4–1.5 line-height.
+	•	Corners 14px, blur backdrop, soft shadows, focus-ring visible (WCAG AA).
+	•	Motion: subtle parallax glow behind the primary button; 200–250ms ease.
+
+Screens to produce (HTML/CSS/React only):
+	1.	Tip Page (core QR landing)
+	•	Header: avatar (circle), worker name, role, city.
+	•	“Say thanks” line + live-looking tip meter (static stub).
+	•	Tip presets: $3, $5, $10, $20, Custom; large pill buttons.
+	•	Payment grid (buttons with brand icons): Venmo, Cash App, Zelle, Apple Pay/Card (Stripe), “Other”.
+	•	On click: open modal with short instructions + copyable handle/QR (stub).
+	•	Optional note textarea (“Add a note for [Name]”—140 char max).
+	•	Review row: Google / Yelp buttons (icons) → open links (stub).
+	•	Footer: “Share my TipLink” + copy URL button.
+	2.	Mini Profile Editor (modal/sheet)
+	•	Fields: name, role, avatar upload (stub), Venmo handle, Cash App cashtag, Zelle phone/email, Stripe pay link.
+	•	Save button (no real save yet).
+	3.	Success/Thanks state
+	•	Confetti burst, “You made their day.” + share or leave a review CTA.
+
+Components (clean Tailwind):
+	•	GlassCard, PrimaryButton, PillButton, IconButton, Input, Textarea, Modal, CopyField, Badge, Toast.
+	•	Provide hover, active, disabled, and keyboard focus states.
+
+Accessibility & perf:
+	•	Semantic labels, aria-* on modals, ESC to close, trap focus.
+	•	100% Lighthouse for accessibility on mobile viewport 390×844.
+	•	All icons as inline SVG. No external icon CDN.
+
+Empty-state copy (use placeholders):
+	•	Name: “Jordan M.” Role: “Barista & Shift Lead”.
+	•	Handles: @jordan-coffee etc.
+	•	Review links: placeholders.
+
+Deliverables now:
+	•	A single runnable UI with routes:
+	•	/u/[handle] → Tip Page
+	•	/u/[handle]/edit → Profile Editor (or modal from Tip Page)
+	•	/success → Thanks state
+	•	Responsive (mobile first, then tablet/desktop).
+	•	Include a subtle animated gradient halo behind the primary CTA.
+	•	Ship with a tiny style guide section at /styleguide showing tokens and components.
+
+Acceptance criteria:
+	•	Add-tip flow feels <= 2 taps (preset → payment).
+	•	All interactive elements keyboard-navigable.
+	•	CLS = 0; no layout jumps.
+	•	Visual polish: “premium glass” look with soft glow—and zero clutter.
+
+Out of scope (stub with TODO):
+	•	Real payments, auth, persistence.
