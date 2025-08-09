@@ -11,6 +11,7 @@ interface Worker {
   role: string;
   location: string;
   handle: string;
+  avatar_url?: string;
   todayStats: {
     totalTips: number;
     totalAmount: string;
@@ -45,6 +46,23 @@ export default function Dashboard() {
     enabled: !!handle,
   });
 
+  // Demo data for when handle is 'demo'
+  const demoWorker: Worker = {
+    id: 'demo-id',
+    name: 'Jordan M.',
+    role: 'Barista & Shift Lead',
+    location: 'Seattle, WA',
+    handle: 'demo',
+    avatar_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150',
+    todayStats: {
+      totalTips: 8,
+      totalAmount: '94.00',
+      avgAmount: '11.75',
+    },
+  };
+
+  const displayWorker = handle === 'demo' ? demoWorker : worker;
+
   const { data: analytics } = useQuery<Analytics[]>({
     queryKey: ["/api/workers", worker?.id, "analytics"],
     enabled: !!worker?.id,
@@ -63,7 +81,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!worker) {
+  if (!displayWorker) {
     return (
       <div className="min-h-screen bg-dark-bg flex items-center justify-center">
         <GlassCard className="p-8 text-center max-w-md mx-4">
@@ -91,13 +109,13 @@ export default function Dashboard() {
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
             <img 
-              src={worker.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150'} 
-              alt={worker.name}
+              src={displayWorker.avatar_url || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150'} 
+              alt={displayWorker.name}
               className="w-16 h-16 rounded-full object-cover border-2 border-glass-border" 
             />
             <div>
-              <h1 className="text-3xl font-bold text-text-primary">{worker.name}</h1>
-              <p className="text-text-secondary">{worker.role} • {worker.location}</p>
+              <h1 className="text-3xl font-bold text-text-primary">{displayWorker.name}</h1>
+              <p className="text-text-secondary">{displayWorker.role} • {displayWorker.location}</p>
             </div>
           </div>
           
@@ -115,21 +133,21 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           <GlassCard className="p-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-accent-start mb-1">{worker.todayStats.totalTips}</div>
+              <div className="text-3xl font-bold text-accent-start mb-1">{displayWorker.todayStats.totalTips}</div>
               <div className="text-sm text-text-secondary">Tips Today</div>
             </div>
           </GlassCard>
           
           <GlassCard className="p-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-text-primary mb-1">${worker.todayStats.totalAmount}</div>
+              <div className="text-3xl font-bold text-text-primary mb-1">${displayWorker.todayStats.totalAmount}</div>
               <div className="text-sm text-text-secondary">Today's Earnings</div>
             </div>
           </GlassCard>
           
           <GlassCard className="p-6">
             <div className="text-center">
-              <div className="text-3xl font-bold text-accent-end mb-1">${worker.todayStats.avgAmount}</div>
+              <div className="text-3xl font-bold text-accent-end mb-1">${displayWorker.todayStats.avgAmount}</div>
               <div className="text-sm text-text-secondary">Avg Tip Size</div>
             </div>
           </GlassCard>

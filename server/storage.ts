@@ -118,11 +118,11 @@ export class DatabaseStorage implements IStorage {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const [stats] = await db
+    const result = await db
       .select({
         totalTips: count(tips.id),
-        totalAmount: sum(tips.amount),
-        avgAmount: avg(tips.amount),
+        totalAmount: sql<string>`COALESCE(SUM(${tips.amount}), 0)`,
+        avgAmount: sql<string>`COALESCE(AVG(${tips.amount}), 0)`,
       })
       .from(tips)
       .where(
@@ -134,10 +134,11 @@ export class DatabaseStorage implements IStorage {
         )
       );
 
+    const [stats] = result;
     return {
-      totalTips: stats.totalTips || 0,
-      totalAmount: stats.totalAmount || '0',
-      avgAmount: stats.avgAmount || '0',
+      totalTips: stats?.totalTips || 0,
+      totalAmount: stats?.totalAmount || '0',
+      avgAmount: stats?.avgAmount || '0',
     };
   }
 

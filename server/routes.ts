@@ -34,6 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         todayStats: stats,
       });
     } catch (error: any) {
+      console.error("Error fetching worker:", error);
       res.status(500).json({ message: "Error fetching worker: " + error.message });
     }
   });
@@ -47,6 +48,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(worker);
     } catch (error: any) {
       res.status(500).json({ message: "Error updating worker: " + error.message });
+    }
+  });
+
+  // Analytics routes
+  app.get("/api/workers/:id/analytics", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const days = parseInt(req.query.days as string) || 30;
+      
+      const analytics = await storage.getWorkerAnalytics(id, days);
+      res.json(analytics);
+    } catch (error: any) {
+      console.error("Error fetching analytics:", error);
+      res.status(500).json({ message: "Error fetching analytics: " + error.message });
+    }
+  });
+
+  // Tips routes
+  app.get("/api/workers/:id/tips", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const limit = parseInt(req.query.limit as string) || 50;
+      
+      const tips = await storage.getWorkerTips(id, limit);
+      res.json(tips);
+    } catch (error: any) {
+      console.error("Error fetching tips:", error);
+      res.status(500).json({ message: "Error fetching tips: " + error.message });
     }
   });
 
@@ -123,8 +152,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         workerId,
         amount: amount.toString(),
         paymentMethod: 'stripe',
-        customerName,
-        note,
+        customerName: customerName || null,
+        note: note || null,
         status: 'pending',
       });
 

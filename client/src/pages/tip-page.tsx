@@ -44,13 +44,13 @@ export default function TipPage() {
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Track QR scan
+  // Track QR scan when worker data is loaded
   useEffect(() => {
-    if (handle && handle !== 'demo') {
+    if (worker?.id) {
       const recordScan = async () => {
         try {
           await apiRequest("POST", "/api/qr-scans", {
-            workerId: handle, // This will be updated once we get the worker ID
+            workerId: worker.id,
           });
         } catch (error) {
           console.error("Failed to record QR scan:", error);
@@ -58,12 +58,14 @@ export default function TipPage() {
       };
       recordScan();
     }
-  }, [handle]);
+  }, [worker?.id]);
 
-  const { data: worker, isLoading, error } = useQuery<Worker>({
+  const { data: workerData, isLoading, error } = useQuery<Worker>({
     queryKey: ["/api/workers", handle],
     enabled: !!handle && handle !== 'demo',
   });
+
+  const worker = handle === 'demo' ? demoWorker : workerData;
 
   // Demo data for when handle is 'demo'
   const demoWorker: Worker = {
@@ -84,8 +86,6 @@ export default function TipPage() {
       avgAmount: '13.00',
     },
   };
-
-  const workerData = handle === 'demo' ? demoWorker : worker;
 
   const createTipMutation = useMutation({
     mutationFn: async (tipData: any) => {
@@ -133,7 +133,7 @@ export default function TipPage() {
   };
 
   const handleSendTip = () => {
-    if (!canSendTip() || !workerData) return;
+    if (!canSendTip() || !worker) return;
 
     const amount = getCurrentAmount()!;
 
@@ -157,7 +157,7 @@ export default function TipPage() {
   };
 
   const handleOpenReview = (type: 'google' | 'yelp') => {
-    const url = type === 'google' ? workerData?.googleReviewUrl : workerData?.yelpReviewUrl;
+    const url = type === 'google' ? worker?.googleReviewUrl : worker?.yelpReviewUrl;
     if (url) {
       window.open(url, '_blank');
     } else {
@@ -192,7 +192,7 @@ export default function TipPage() {
     );
   }
 
-  if (!workerData) return null;
+  if (!worker) return null;
 
   return (
     <div className="min-h-screen bg-dark-bg">
@@ -206,19 +206,19 @@ export default function TipPage() {
         {/* Header with worker info */}
         <GlassCard className="rounded-2xl p-6 mb-6 text-center">
           <img 
-            src={workerData.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150'} 
-            alt={`${workerData.name} - ${workerData.role}`}
+            src={worker.avatarUrl || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&h=150'} 
+            alt={`${worker.name} - ${worker.role}`}
             className="w-20 h-20 rounded-full mx-auto mb-4 object-cover border-2 border-glass-border" 
           />
-          <h1 className="text-2xl font-semibold text-text-primary mb-1">{workerData.name}</h1>
-          <p className="text-text-secondary mb-1">{workerData.role}</p>
-          {workerData.location && (
+          <h1 className="text-2xl font-semibold text-text-primary mb-1">{worker.name}</h1>
+          <p className="text-text-secondary mb-1">{worker.role}</p>
+          {worker.location && (
             <p className="text-sm text-text-secondary flex items-center justify-center gap-1">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
               </svg>
-              <span>{workerData.location}</span>
+              <span>{worker.location}</span>
             </p>
           )}
         </GlassCard>
@@ -229,12 +229,12 @@ export default function TipPage() {
           <GlassCard className="rounded-xl p-4">
             <div className="flex items-center justify-between text-sm text-text-secondary mb-2">
               <span>Tips received today</span>
-              <span>{workerData.todayStats.totalTips}</span>
+              <span>{worker.todayStats.totalTips}</span>
             </div>
             <div className="w-full bg-glass rounded-full h-2">
               <div 
                 className="bg-gradient-to-r from-accent-start to-accent-end h-2 rounded-full transition-all duration-500" 
-                style={{ width: Math.min((workerData.todayStats.totalTips / 20) * 100, 100) + '%' }}
+                style={{ width: Math.min((worker.todayStats.totalTips / 20) * 100, 100) + '%' }}
               ></div>
             </div>
           </GlassCard>
@@ -282,33 +282,33 @@ export default function TipPage() {
         <div className="mb-6">
           <h3 className="text-lg font-medium text-text-primary mb-4">Choose payment method</h3>
           <div className="grid grid-cols-2 gap-3">
-            {workerData.venmoHandle && (
+            {worker.venmoHandle && (
               <PaymentMethod
                 method="venmo"
                 title="Venmo"
-                subtitle={`@${workerData.venmoHandle}`}
+                subtitle={`@${worker.venmoHandle}`}
                 icon="venmo"
                 isSelected={selectedPaymentMethod === 'venmo'}
                 onSelect={() => handlePaymentMethodSelect('venmo')}
               />
             )}
 
-            {workerData.cashappHandle && (
+            {worker.cashappHandle && (
               <PaymentMethod
                 method="cashapp"
                 title="Cash App"
-                subtitle={`$${workerData.cashappHandle}`}
+                subtitle={`$${worker.cashappHandle}`}
                 icon="cashapp"
                 isSelected={selectedPaymentMethod === 'cashapp'}
                 onSelect={() => handlePaymentMethodSelect('cashapp')}
               />
             )}
 
-            {workerData.zelleInfo && (
+            {worker.zelleInfo && (
               <PaymentMethod
                 method="zelle"
                 title="Zelle"
-                subtitle={workerData.zelleInfo}
+                subtitle={worker.zelleInfo}
                 icon="zelle"
                 isSelected={selectedPaymentMethod === 'zelle'}
                 onSelect={() => handlePaymentMethodSelect('zelle')}
@@ -330,7 +330,7 @@ export default function TipPage() {
         <div className="mb-6">
           <GlassCard className="rounded-xl p-4">
             <label className="block text-sm font-medium text-text-secondary mb-2">
-              Add a note for {workerData.name} (optional)
+              Add a note for {worker.name} (optional)
             </label>
             <textarea 
               className="w-full bg-transparent border border-glass-border rounded-lg py-3 px-4 text-text-primary placeholder-text-secondary focus:border-accent-start focus:outline-none focus:ring-2 focus:ring-accent-start focus:ring-opacity-20 resize-none" 
@@ -418,14 +418,14 @@ export default function TipPage() {
       {/* Modals */}
       {showProfileEditor && (
         <ProfileEditor
-          worker={workerData}
+          worker={worker}
           onClose={() => setShowProfileEditor(false)}
         />
       )}
 
       {showPaymentModal && (
         <PaymentModal
-          worker={workerData}
+          worker={worker}
           amount={getCurrentAmount()!}
           paymentMethod={selectedPaymentMethod!}
           onClose={() => setShowPaymentModal(false)}
