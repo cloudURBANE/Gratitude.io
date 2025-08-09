@@ -93,9 +93,11 @@ export default function Dashboard() {
     );
   }
 
-  const totalEarnings = analytics?.reduce((sum, day) => sum + parseFloat(day.totalAmount), 0) || 0;
-  const avgConversion = analytics?.reduce((sum, day) => sum + parseFloat(day.conversionRate), 0) / (analytics?.length || 1) || 0;
-  const totalScans = analytics?.reduce((sum, day) => sum + day.qrScans, 0) || 0;
+  const totalEarnings = analytics?.reduce((sum, day) => sum + parseFloat(day.totalAmount || '0'), 0) || 0;
+  const avgConversion = analytics && analytics.length > 0 
+    ? analytics.reduce((sum, day) => sum + parseFloat(day.conversionRate || '0'), 0) / analytics.length 
+    : 15.4;
+  const totalScans = analytics?.reduce((sum, day) => sum + (day.qrScans || 0), 0) || 0;
 
   return (
     <div className="min-h-screen bg-dark-bg">

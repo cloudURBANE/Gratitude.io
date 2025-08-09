@@ -110,7 +110,7 @@ export default function TipPage() {
       setShowPaymentModal(false);
 
       // Show review prompt after successful tip (30% chance to avoid being intrusive)  
-      if (Math.random() < 0.3 && (worker?.googleReviewUrl || worker?.yelpReviewUrl)) {
+      if (Math.random() < 0.3 && worker && (worker.googleReviewUrl || worker.yelpReviewUrl)) {
         setTimeout(() => setShowReviewPrompt(true), 1500);
       }
     },
