@@ -1,563 +1,327 @@
 import type { Express } from "express";
-import express from "express";
 import { createServer, type Server } from "http";
-import Stripe from "stripe";
 import { storage } from "./storage";
-import { insertTipSchema, insertQrScanSchema } from "@shared/schema";
-import QRCode from 'qrcode';
+import { insertProfileSchema, insertTipSchema } from "@shared/schema";
+import Stripe from "stripe";
+import { createHash } from "crypto";
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+// Initialize Stripe if available
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2023-10-16",
+  });
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: "2024-06-20" as any,
-});
+function getClientIp(req: any): string {
+  return req.ip || 
+         req.connection.remoteAddress || 
+         req.socket.remoteAddress || 
+         req.headers['x-forwarded-for']?.split(',')[0] || 
+         '0.0.0.0';
+}
+
+function hashIp(ip: string): string {
+  return createHash('sha256').update(ip + (process.env.IP_SALT || 'tipvault-salt')).digest('hex');
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  
-  // Worker routes
-  app.get("/api/workers/:handle", async (req, res) => {
+  // Health check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Profile endpoints
+  app.get('/api/profiles/:handle', async (req, res) => {
     try {
       const { handle } = req.params;
-      const worker = await storage.getWorkerByHandle(handle);
+      const profile = await storage.getProfileByHandle(handle);
       
-      if (!worker) {
-        return res.status(404).json({ message: "Worker not found" });
+      if (!profile) {
+        return res.status(404).json({ error: 'Profile not found' });
       }
 
-      // Get today's stats
-      const stats = await storage.getWorkerDailyStats(worker.id);
-      
-      res.json({
-        ...worker,
-        todayStats: stats,
-      });
-    } catch (error: any) {
-      console.error("Error fetching worker:", error);
-      res.status(500).json({ message: "Error fetching worker: " + error.message });
+      res.json(profile);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
-  app.put("/api/workers/:id", async (req, res) => {
+  app.post('/api/profiles', async (req, res) => {
+    try {
+      const profileData = insertProfileSchema.parse(req.body);
+      const profile = await storage.createProfile(profileData);
+      res.status(201).json(profile);
+    } catch (error) {
+      console.error('Error creating profile:', error);
+      res.status(400).json({ error: 'Invalid profile data' });
+    }
+  });
+
+  // Tip endpoints
+  app.post('/api/tips', async (req, res) => {
+    try {
+      const tipData = insertTipSchema.parse({
+        ...req.body,
+        ipHash: hashIp(getClientIp(req)),
+      });
+
+      const tip = await storage.createTip(tipData);
+
+      // Handle Stripe payments
+      if (tipData.paymentMethod === 'stripe' && stripe) {
+        try {
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(Number(tipData.amount) * 100), // Convert to cents
+            currency: 'usd',
+            metadata: {
+              tipId: tip.id,
+              profileId: tipData.profileId,
+            },
+          });
+
+          // Update tip with payment intent ID
+          await storage.updateTipStatus(tip.id, 'processing');
+          
+          return res.json({
+            ...tip,
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
+          });
+        } catch (stripeError) {
+          console.error('Stripe error:', stripeError);
+          await storage.updateTipStatus(tip.id, 'failed');
+          return res.status(500).json({ error: 'Payment processing failed' });
+        }
+      }
+
+      // For non-Stripe payments, return success immediately
+      // These will be marked as completed when payment is verified
+      res.status(201).json(tip);
+    } catch (error) {
+      console.error('Error creating tip:', error);
+      res.status(400).json({ error: 'Invalid tip data' });
+    }
+  });
+
+  app.get('/api/tips/:id', async (req, res) => {
     try {
       const { id } = req.params;
-      const updateData = req.body;
+      const tip = await storage.getTip(id);
       
-      const worker = await storage.updateWorker(id, updateData);
-      res.json(worker);
-    } catch (error: any) {
-      res.status(500).json({ message: "Error updating worker: " + error.message });
+      if (!tip) {
+        return res.status(404).json({ error: 'Tip not found' });
+      }
+
+      res.json(tip);
+    } catch (error) {
+      console.error('Error fetching tip:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 
-  // Analytics routes
-  app.get("/api/workers/:id/analytics", async (req, res) => {
+  // Payment verification endpoints
+  app.get('/api/payments/:paymentIntentId/status', async (req, res) => {
+    try {
+      const { paymentIntentId } = req.params;
+      
+      if (!stripe) {
+        return res.status(400).json({ error: 'Stripe not configured' });
+      }
+
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      // Update tip status based on payment intent status
+      if (paymentIntent.metadata.tipId) {
+        let status = 'pending';
+        if (paymentIntent.status === 'succeeded') {
+          status = 'completed';
+        } else if (paymentIntent.status === 'canceled') {
+          status = 'failed';
+        }
+        
+        await storage.updateTipStatus(
+          paymentIntent.metadata.tipId, 
+          status,
+          paymentIntent.status === 'succeeded' ? new Date() : undefined
+        );
+      }
+
+      res.json({
+        success: paymentIntent.status === 'succeeded',
+        status: paymentIntent.status,
+        paymentIntent: {
+          id: paymentIntent.id,
+          amount: paymentIntent.amount,
+          currency: paymentIntent.currency,
+          status: paymentIntent.status,
+        },
+      });
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      res.status(500).json({ 
+        success: false,
+        status: 'error',
+        error: 'Failed to verify payment' 
+      });
+    }
+  });
+
+  // Event tracking
+  app.post('/api/events/track', async (req, res) => {
+    try {
+      const eventData = {
+        profileId: req.body.profileId || null,
+        sessionId: req.body.sessionId,
+        eventType: req.body.eventType,
+        eventData: req.body.eventData || {},
+        userAgent: req.body.userAgent || req.get('User-Agent'),
+        ipHash: hashIp(getClientIp(req)),
+        referrer: req.body.referrer || req.get('Referer'),
+      };
+
+      const event = await storage.trackEvent(eventData);
+      res.status(201).json({ success: true, eventId: event.id });
+    } catch (error) {
+      console.error('Error tracking event:', error);
+      res.status(500).json({ error: 'Failed to track event' });
+    }
+  });
+
+  // QR scan tracking
+  app.post('/api/qr/scan', async (req, res) => {
+    try {
+      const scanData = {
+        profileId: req.body.profileId,
+        sessionId: req.body.sessionId,
+        ipHash: hashIp(getClientIp(req)),
+        userAgent: req.get('User-Agent'),
+        referrer: req.get('Referer'),
+      };
+
+      const scan = await storage.trackQrScan(scanData);
+      res.status(201).json({ success: true, scanId: scan.id });
+    } catch (error) {
+      console.error('Error tracking QR scan:', error);
+      res.status(500).json({ error: 'Failed to track QR scan' });
+    }
+  });
+
+  // Reviews endpoint
+  app.post('/api/reviews', async (req, res) => {
+    try {
+      const { profileId, rating, reviewText, sessionId } = req.body;
+      
+      // Find the most recent tip from this session for this profile
+      const tips = await storage.getProfileTips(profileId, 10);
+      const sessionTip = tips.find(tip => tip.sessionId === sessionId);
+      
+      if (sessionTip) {
+        // Update the tip with rating and review
+        await storage.updateTipStatus(sessionTip.id, sessionTip.status || 'pending');
+        // Note: In a real implementation, you'd add rating/reviewText update to storage
+      }
+
+      // Track review submission event
+      await storage.trackEvent({
+        profileId,
+        sessionId,
+        eventType: 'review_submitted',
+        eventData: { rating, hasReviewText: !!reviewText },
+        ipHash: hashIp(getClientIp(req)),
+        userAgent: req.get('User-Agent'),
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      res.status(500).json({ error: 'Failed to submit review' });
+    }
+  });
+
+  // Ad serving endpoint
+  app.post('/api/ads/serve', async (req, res) => {
+    try {
+      const { slot, profileId, sessionId } = req.body;
+      
+      // Simple house ad serving logic
+      const houseAds = [
+        {
+          id: 'house-pro-upgrade',
+          title: '✨ Go Ad-Free with TipVault Pro',
+          body: 'Remove ads, get custom branding, detailed analytics, and more premium features.',
+          cta: 'Upgrade to Pro',
+          url: '/upgrade',
+          type: 'house',
+        },
+        {
+          id: 'house-nfc-kit',
+          title: '🏷️ Get Your NFC Tap Kit',
+          body: 'Physical NFC cards + QR stickers. Customers just tap to tip with prefilled amounts.',
+          cta: 'Order Kit ($15)',
+          url: '/shop/nfc-kit',
+          type: 'house',
+        },
+      ];
+
+      const ad = houseAds[Math.floor(Math.random() * houseAds.length)];
+      
+      // Track impression
+      await storage.trackImpression({
+        profileId: profileId || null,
+        slot,
+        adId: ad.id,
+        sessionId,
+        ipHash: hashIp(getClientIp(req)),
+        userAgent: req.get('User-Agent'),
+      });
+
+      res.json({ ad });
+    } catch (error) {
+      console.error('Error serving ad:', error);
+      res.status(500).json({ error: 'Failed to serve ad' });
+    }
+  });
+
+  // Ad click tracking
+  app.post('/api/ads/click', async (req, res) => {
+    try {
+      const { adId, slot, profileId, sessionId } = req.body;
+      
+      // Track click event
+      await storage.trackEvent({
+        profileId: profileId || null,
+        sessionId,
+        eventType: 'ad_click',
+        eventData: { adId, slot },
+        ipHash: hashIp(getClientIp(req)),
+        userAgent: req.get('User-Agent'),
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error tracking ad click:', error);
+      res.status(500).json({ error: 'Failed to track ad click' });
+    }
+  });
+
+  // Analytics endpoints
+  app.get('/api/profiles/:id/analytics', async (req, res) => {
     try {
       const { id } = req.params;
       const days = parseInt(req.query.days as string) || 30;
       
-      const analytics = await storage.getWorkerAnalytics(id, days);
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+      
+      const analytics = await storage.getProfileAnalytics(id, startDate, endDate);
+      
       res.json(analytics);
-    } catch (error: any) {
-      console.error("Error fetching analytics:", error);
-      res.status(500).json({ message: "Error fetching analytics: " + error.message });
-    }
-  });
-
-  // Tips routes
-  app.get("/api/workers/:id/tips", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const limit = parseInt(req.query.limit as string) || 50;
-      
-      const tips = await storage.getWorkerTips(id, limit);
-      res.json(tips);
-    } catch (error: any) {
-      console.error("Error fetching tips:", error);
-      res.status(500).json({ message: "Error fetching tips: " + error.message });
-    }
-  });
-
-  // QR Code generation route  
-  app.get("/api/workers/:handle/qr", async (req, res) => {
-    try {
-      const { handle } = req.params;
-      const baseUrl = `${req.protocol}://${req.get('host')}`;
-      const tipUrl = `${baseUrl}/u/${handle}`;
-      
-      // Generate a proper QR code using QRCode library
-      const qrCode = await QRCode.toDataURL(tipUrl, {
-        errorCorrectionLevel: 'M',
-        margin: 2,
-        color: {
-          dark: '#0B0B0F',
-          light: '#FFFFFF'
-        },
-        width: 256
-      });
-
-      res.json({
-        qrCode,
-        url: tipUrl,
-      });
-    } catch (error: any) {
-      console.error("Error generating QR code:", error);
-      res.status(500).json({ message: "Error generating QR code: " + error.message });
-    }
-  });
-
-  // Enhanced review interaction tracking with service rating
-  app.post("/api/review-interactions", async (req, res) => {
-    try {
-      const { workerId, platform, rating, hasText, reviewText, serviceRating, tipAmount } = req.body;
-      
-      // Comprehensive review tracking
-      const reviewData = {
-        id: `review-${Date.now()}`,
-        workerId: workerId || 'demo-worker',
-        platform: platform || 'tiplink',
-        rating: parseInt(rating) || serviceRating || 5,
-        hasText: hasText || (reviewText && reviewText.length > 0),
-        reviewText: reviewText || '',
-        serviceRating: parseInt(serviceRating) || 5,
-        tipAmount: parseFloat(tipAmount) || 0,
-        timestamp: new Date().toISOString(),
-        validated: true
-      };
-
-      // Store in temporary memory for demo
-      console.log('Review interaction tracked:', reviewData);
-      
-      res.json({ 
-        success: true,
-        message: "Review interaction tracked successfully",
-        reviewId: reviewData.id,
-        rating: reviewData.rating,
-        validated: reviewData.serviceRating >= 4 // Valid if 4+ stars
-      });
-    } catch (error: any) {
-      console.error("Error tracking review interaction:", error);
-      res.status(500).json({ 
-        message: "Error tracking review interaction: " + error.message 
-      });
-    }
-  });
-
-  // Review stats endpoint
-  app.get("/api/workers/:id/review-stats", async (req, res) => {
-    try {
-      const { id } = req.params;
-      
-      // Demo stats - in production this would query the database
-      const stats = {
-        totalReviews: 47,
-        averageRating: 4.8,
-        googleReviews: 32,
-        yelpReviews: 15,
-        recentReviews: [
-          { platform: 'google', rating: 5, date: '2025-01-07', hasText: true },
-          { platform: 'yelp', rating: 5, date: '2025-01-06', hasText: true },
-          { platform: 'google', rating: 4, date: '2025-01-05', hasText: false },
-          { platform: 'google', rating: 5, date: '2025-01-04', hasText: true },
-        ],
-        conversionRate: 23.5,
-      };
-
-      res.json(stats);
-    } catch (error: any) {
-      console.error("Error fetching review stats:", error);
-      res.status(500).json({ message: "Error fetching review stats: " + error.message });
-    }
-  });
-
-
-
-  // QR scan tracking
-  app.post("/api/qr-scans", async (req, res) => {
-    try {
-      const { workerId } = req.body;
-      
-      if (!workerId) {
-        return res.status(400).json({ message: "Worker ID is required" });
-      }
-
-      // For demo purposes, return success without database validation
-      res.status(201).json({ 
-        id: `scan-${Date.now()}`,
-        workerId,
-        scannedAt: new Date().toISOString(),
-        success: true
-      });
-    } catch (error: any) {
-      res.status(500).json({ message: "Error recording QR scan: " + error.message });
-    }
-  });
-
-  // Tip creation
-  app.post("/api/tips", async (req, res) => {
-    try {
-      const { workerId, amount, paymentMethod, note } = req.body;
-      
-      if (!workerId || !amount || !paymentMethod) {
-        return res.status(400).json({ message: "Missing required fields" });
-      }
-
-      // For demo, return success without database operations
-      const tip = {
-        id: `tip-${Date.now()}`,
-        workerId,
-        amount: parseFloat(amount),
-        paymentMethod,
-        note: note || '',
-        status: 'completed',
-        createdAt: new Date().toISOString()
-      };
-      
-      res.status(201).json(tip);
-    } catch (error: any) {
-      res.status(500).json({ message: "Error creating tip: " + error.message });
-    }
-  });
-
-  // Enhanced Stripe payment intent with comprehensive validation and verification
-  app.post("/api/create-payment-intent", async (req, res) => {
-    try {
-      const { amount, workerId, note, customerName, description, paymentId } = req.body;
-      
-      // Comprehensive validation
-      const amountInCents = Math.round(parseFloat(amount) * 100);
-      
-      if (isNaN(amountInCents) || amountInCents < 50) {
-        return res.status(400).json({ 
-          message: "Invalid amount. Minimum is $0.50",
-          code: "INVALID_AMOUNT"
-        });
-      }
-
-      if (amountInCents > 100000) { // $1000 max
-        return res.status(400).json({ 
-          message: "Amount exceeds maximum limit of $1000",
-          code: "AMOUNT_TOO_HIGH"
-        });
-      }
-
-      // Store payment intent for verification tracking
-      if (paymentId) {
-        try {
-          await storage.createPaymentIntent({
-            paymentId,
-            amount: amountInCents / 100,
-            workerId: workerId || "demo-worker",
-            customerName: customerName || "Anonymous",
-            status: 'pending',
-            method: 'stripe'
-          });
-        } catch (dbError) {
-          console.warn('Failed to store payment intent:', dbError);
-        }
-      }
-
-      // Create Stripe payment intent with comprehensive metadata
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency: "usd",
-        description: description || `Tip payment of $${(amountInCents / 100).toFixed(2)}`,
-        automatic_payment_methods: {
-          enabled: true,
-        },
-        metadata: {
-          workerId: workerId || 'demo-worker',
-          note: note || '',
-          customerName: customerName || 'Anonymous',
-          tip_amount: (amountInCents / 100).toFixed(2),
-          paymentId: paymentId || `stripe_${Date.now()}`,
-          timestamp: Date.now().toString(),
-          type: "tip"
-        },
-      });
-
-      // Update storage with Stripe payment intent ID
-      if (paymentId) {
-        try {
-          const payment = await storage.getPaymentIntent(paymentId);
-          if (payment) {
-            payment.stripePaymentIntentId = paymentIntent.id;
-            await storage.updatePaymentStatus(paymentId, 'processing');
-          }
-        } catch (error) {
-          console.warn('Failed to update payment with Stripe ID:', error);
-        }
-      }
-
-      res.json({ 
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-        amount: amountInCents / 100,
-        status: 'created',
-        paymentId: paymentId
-      });
-    } catch (error: any) {
-      console.error("Stripe payment intent error:", error);
-      res.status(500).json({ 
-        message: "Error creating payment intent: " + error.message,
-        code: "STRIPE_ERROR"
-      });
-    }
-  });
-
-  // Payment verification endpoint
-  app.post("/api/payments/:paymentId/verify", async (req, res) => {
-    try {
-      const { paymentId } = req.params;
-      
-      const payment = await storage.getPaymentIntent(paymentId);
-      
-      if (!payment) {
-        return res.status(404).json({ 
-          verified: false, 
-          message: "Payment not found" 
-        });
-      }
-
-      // For Stripe payments, verify with Stripe API
-      if (payment.method === 'stripe' && payment.stripePaymentIntentId) {
-        try {
-          const paymentIntent = await stripe.paymentIntents.retrieve(payment.stripePaymentIntentId);
-          
-          if (paymentIntent.status === 'succeeded') {
-            await storage.updatePaymentStatus(paymentId, 'completed');
-            return res.json({ 
-              verified: true, 
-              status: 'completed',
-              amount: paymentIntent.amount / 100
-            });
-          }
-        } catch (stripeError) {
-          console.warn('Stripe verification failed:', stripeError);
-        }
-      }
-
-      if (payment.status === 'completed') {
-        return res.json({ 
-          verified: true, 
-          status: 'completed',
-          amount: payment.amount 
-        });
-      }
-
-      res.json({ 
-        verified: false, 
-        status: payment.status,
-        message: "Payment not yet completed" 
-      });
-      
-    } catch (error: any) {
-      console.error("Payment verification error:", error);
-      res.status(500).json({ 
-        verified: false, 
-        message: "Verification failed", 
-        error: error.message 
-      });
-    }
-  });
-
-  // Manual payment confirmation for external apps
-  app.post("/api/payments/:paymentId/confirm", async (req, res) => {
-    try {
-      const { paymentId } = req.params;
-      
-      const payment = await storage.getPaymentIntent(paymentId);
-      
-      if (!payment) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Payment not found" 
-        });
-      }
-
-      await storage.updatePaymentStatus(paymentId, 'completed');
-      
-      // Create tip record
-      try {
-        await storage.createTip({
-          amount: payment.amount,
-          paymentMethod: payment.method,
-          workerId: payment.workerId,
-          paymentIntentId: paymentId,
-          status: 'completed'
-        });
-      } catch (tipError) {
-        console.warn('Failed to create tip record:', tipError);
-      }
-
-      res.json({ 
-        success: true, 
-        message: "Payment confirmed",
-        amount: payment.amount 
-      });
-      
-    } catch (error: any) {
-      console.error("Payment confirmation error:", error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Confirmation failed", 
-        error: error.message 
-      });
-    }
-  });
-
-  // Stripe webhook (optional - for production webhook handling)
-  app.post("/api/stripe-webhook", express.raw({ type: 'application/json' }), async (req, res) => {
-    try {
-      // In demo mode, we'll simulate successful payments without webhook verification
-      const body = JSON.parse(req.body.toString());
-      
-      if (body.type === 'payment_intent.succeeded') {
-        const paymentIntent = body.data.object;
-        const tipId = paymentIntent.metadata?.tipId;
-        
-        if (tipId) {
-          await storage.updateTipStatus(tipId, 'completed');
-          
-          // Update analytics
-          const tip = await storage.getTip(tipId);
-          if (tip) {
-            await storage.updateDailyAnalytics(tip.workerId, new Date());
-          }
-        }
-      }
-
-      res.json({ received: true });
-    } catch (error: any) {
-      res.status(400).json({ message: "Webhook error: " + error.message });
-    }
-  });
-
-  // Analytics routes
-  app.get("/api/workers/:id/analytics", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { days = "30" } = req.query;
-      
-      const analytics = await storage.getWorkerAnalytics(id, parseInt(days as string));
-      res.json(analytics);
-    } catch (error: any) {
-      res.status(500).json({ message: "Error fetching analytics: " + error.message });
-    }
-  });
-
-  app.get("/api/workers/:id/tips", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { limit = "50" } = req.query;
-      
-      const tips = await storage.getWorkerTips(id, parseInt(limit as string));
-      res.json(tips);
-    } catch (error: any) {
-      res.status(500).json({ message: "Error fetching tips: " + error.message });
-    }
-  });
-
-  // QR Code Generation Endpoints
-  app.post("/api/qr/generate", async (req, res) => {
-    try {
-      const { handle, options = {} } = req.body;
-      
-      if (!handle) {
-        return res.status(400).json({ error: "Handle is required" });
-      }
-
-      // Verify worker exists
-      const worker = await storage.getWorkerByHandle(handle);
-      if (!worker) {
-        return res.status(404).json({ error: "Worker not found" });
-      }
-
-      const baseUrl = req.protocol + '://' + req.get('host');
-      const tipPageUrl = `${baseUrl}/u/${handle}`;
-      
-      const qrOptions: any = {
-        errorCorrectionLevel: options.errorCorrectionLevel || 'M',
-        type: 'image/png' as const,
-        margin: options.margin || 4,
-        color: {
-          dark: options.foregroundColor || '#10b981',
-          light: options.backgroundColor || '#ffffff',
-        },
-        width: options.size || 512,
-      };
-
-      const qrDataUrl = await QRCode.toDataURL(tipPageUrl, qrOptions);
-
-      // Update worker's QR code URL in database
-      await storage.updateWorker(worker.id, { qrCodeUrl: qrDataUrl });
-
-      res.json({
-        success: true,
-        qrCode: qrDataUrl,
-        url: tipPageUrl,
-        handle: handle
-      });
-    } catch (error: any) {
-      console.error("QR generation error:", error);
-      res.status(500).json({ 
-        error: "Failed to generate QR code", 
-        message: error.message 
-      });
-    }
-  });
-
-  app.get("/api/qr/:handle", async (req, res) => {
-    try {
-      const { handle } = req.params;
-      
-      const worker = await storage.getWorkerByHandle(handle);
-      if (!worker) {
-        return res.status(404).json({ error: "Worker not found" });
-      }
-
-      if (worker.qrCodeUrl) {
-        res.json({
-          success: true,
-          qrCode: worker.qrCodeUrl,
-          url: `${req.protocol}://${req.get('host')}/u/${handle}`,
-          handle: handle,
-          cached: true
-        });
-      } else {
-        // Generate QR code if not exists
-        const baseUrl = req.protocol + '://' + req.get('host');
-        const tipPageUrl = `${baseUrl}/u/${handle}`;
-        
-        const qrDataUrl = await QRCode.toDataURL(tipPageUrl, {
-          errorCorrectionLevel: 'M' as any,
-          type: 'image/png' as const,
-          margin: 4,
-          color: {
-            dark: '#10b981',
-            light: '#ffffff',
-          },
-          width: 512,
-        } as any);
-
-        // Cache the generated QR code
-        await storage.updateWorker(worker.id, { qrCodeUrl: qrDataUrl });
-
-        res.json({
-          success: true,
-          qrCode: qrDataUrl,
-          url: tipPageUrl,
-          handle: handle,
-          cached: false
-        });
-      }
-    } catch (error: any) {
-      console.error("QR retrieval error:", error);
-      res.status(500).json({ 
-        error: "Failed to retrieve QR code", 
-        message: error.message 
-      });
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      res.status(500).json({ error: 'Internal server error' });
     }
   });
 

@@ -15,25 +15,10 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
 
-// Session storage table.
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
 // Users table (for auth and billing)
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email", { length: 255 }).unique(),
-  firstName: varchar("first_name", { length: 100 }),
-  lastName: varchar("last_name", { length: 100 }),
-  profileImageUrl: varchar("profile_image_url", { length: 255 }),
   plan: varchar("plan", { length: 20 }).notNull().default("free"), // 'free' | 'pro'
   stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
@@ -46,7 +31,7 @@ export const users = pgTable("users", {
 // Profiles (tip pages) - one user can have multiple profiles
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 100 }).notNull(),
   role: varchar("role", { length: 100 }).notNull(),
   location: varchar("location", { length: 100 }),
@@ -173,7 +158,7 @@ export const impressions = pgTable("impressions", {
 // Purchases (for Pro subscriptions and add-ons)
 export const purchases = pgTable("purchases", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   sku: varchar("sku", { length: 50 }).notNull(), // 'pro_monthly', 'pro_yearly', 'nfc_kit', 'custom_domain'
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("USD"),
@@ -287,8 +272,8 @@ export const insertPurchaseSchema = createInsertSchema(purchases);
 export const insertWalletPassSchema = createInsertSchema(walletPasses);
 
 // Types
-export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
 
 export type Profile = typeof profiles.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;

@@ -1,264 +1,362 @@
 import {
-  workers,
+  users,
+  profiles,
   tips,
   analytics,
   qrScans,
-  type Worker,
-  type InsertWorker,
+  events,
+  impressions,
+  type User,
+  type UpsertUser,
+  type Profile,
+  type InsertProfile,
   type Tip,
   type InsertTip,
   type Analytics,
   type InsertAnalytics,
   type QrScan,
   type InsertQrScan,
+  type Event,
+  type InsertEvent,
+  type Impression,
+  type InsertImpression,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, sql, sum, avg, count } from "drizzle-orm";
+import { eq, desc, and, gte, lt, sql, count, sum, avg } from "drizzle-orm";
+import { createHash } from "crypto";
 
+// Interface for storage operations
 export interface IStorage {
-  // Workers
-  getWorker(id: string): Promise<Worker | undefined>;
-  getWorkerByHandle(handle: string): Promise<Worker | undefined>;
-  createWorker(worker: InsertWorker): Promise<Worker>;
-  updateWorker(id: string, worker: Partial<InsertWorker>): Promise<Worker>;
+  // User operations (for Replit Auth)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
   
-  // Tips
+  // Profile operations
+  getProfile(id: string): Promise<(Profile & { user: User }) | undefined>;
+  getProfileByHandle(handle: string): Promise<(Profile & { user: User }) | undefined>;
+  createProfile(profile: InsertProfile): Promise<Profile>;
+  updateProfile(id: string, updates: Partial<InsertProfile>): Promise<Profile | undefined>;
+  deleteProfile(id: string): Promise<boolean>;
+  getUserProfiles(userId: string): Promise<Profile[]>;
+
+  // Tip operations
   createTip(tip: InsertTip): Promise<Tip>;
   getTip(id: string): Promise<Tip | undefined>;
-  updateTipStatus(id: string, status: string, paymentIntentId?: string): Promise<Tip>;
-  getWorkerTips(workerId: string, limit?: number): Promise<Tip[]>;
-  getWorkerDailyStats(workerId: string, date?: Date): Promise<{
-    totalTips: number;
-    totalAmount: string;
-    avgAmount: string;
-  }>;
-  
-  // Analytics
-  updateDailyAnalytics(workerId: string, date: Date): Promise<void>;
-  getWorkerAnalytics(workerId: string, days?: number): Promise<Analytics[]>;
-  
-  // QR Scans
-  recordQrScan(scan: InsertQrScan): Promise<QrScan>;
-  markQrScanConverted(scanId: string, tipId: string): Promise<void>;
-  
-  // Payment verification
-  createPaymentIntent(paymentIntent: any): Promise<any>;
-  getPaymentIntent(paymentId: string): Promise<any>;
-  updatePaymentStatus(paymentId: string, status: string): Promise<void>;
+  updateTipStatus(id: string, status: string, processedAt?: Date): Promise<Tip | undefined>;
+  getProfileTips(profileId: string, limit?: number): Promise<Tip[]>;
+
+  // Analytics operations
+  getProfileAnalytics(profileId: string, startDate: Date, endDate: Date): Promise<Analytics[]>;
+  updateDailyAnalytics(profileId: string, date: Date): Promise<void>;
+
+  // Event tracking
+  trackEvent(event: InsertEvent): Promise<Event>;
+  getProfileEvents(profileId: string, eventType?: string, limit?: number): Promise<Event[]>;
+
+  // QR scan tracking
+  trackQrScan(scan: InsertQrScan): Promise<QrScan>;
+  updateQrScanConversion(scanId: string, tipId: string): Promise<QrScan | undefined>;
+
+  // Ad impressions
+  trackImpression(impression: InsertImpression): Promise<Impression>;
+  updateImpressionClick(impressionId: string): Promise<Impression | undefined>;
+}
+
+function hashIp(ip: string): string {
+  return createHash('sha256').update(ip + process.env.IP_SALT || 'tipvault-salt').digest('hex');
 }
 
 export class DatabaseStorage implements IStorage {
-  // Workers
-  async getWorker(id: string): Promise<Worker | undefined> {
-    const [worker] = await db.select().from(workers).where(eq(workers.id, id));
-    return worker;
+  // User operations (for Replit Auth)
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
   }
 
-  async getWorkerByHandle(handle: string): Promise<Worker | undefined> {
-    const [worker] = await db.select().from(workers).where(eq(workers.handle, handle));
-    return worker;
-  }
-
-  async createWorker(insertWorker: InsertWorker): Promise<Worker> {
-    const [worker] = await db
-      .insert(workers)
-      .values(insertWorker)
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
       .returning();
-    return worker;
+    return user;
   }
 
-  async updateWorker(id: string, updateData: Partial<InsertWorker>): Promise<Worker> {
-    const [worker] = await db
-      .update(workers)
-      .set({ ...updateData, updatedAt: new Date() })
-      .where(eq(workers.id, id))
+  // Profile operations
+  async getProfile(id: string): Promise<(Profile & { user: User }) | undefined> {
+    const result = await db
+      .select()
+      .from(profiles)
+      .innerJoin(users, eq(profiles.userId, users.id))
+      .where(eq(profiles.id, id))
+      .limit(1);
+    
+    if (!result[0]) return undefined;
+    
+    return {
+      ...result[0].profiles,
+      user: result[0].users,
+    };
+  }
+
+  async getProfileByHandle(handle: string): Promise<(Profile & { user: User }) | undefined> {
+    const result = await db
+      .select()
+      .from(profiles)
+      .innerJoin(users, eq(profiles.userId, users.id))
+      .where(eq(profiles.handle, handle))
+      .limit(1);
+    
+    if (!result[0]) return undefined;
+    
+    return {
+      ...result[0].profiles,
+      user: result[0].users,
+    };
+  }
+
+  async createProfile(profile: InsertProfile): Promise<Profile> {
+    const [createdProfile] = await db
+      .insert(profiles)
+      .values(profile)
       .returning();
-    return worker;
+    return createdProfile;
   }
 
-  // Tips
-  async createTip(insertTip: InsertTip): Promise<Tip> {
-    const [tip] = await db
+  async updateProfile(id: string, updates: Partial<InsertProfile>): Promise<Profile | undefined> {
+    const [updatedProfile] = await db
+      .update(profiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(profiles.id, id))
+      .returning();
+    return updatedProfile;
+  }
+
+  async deleteProfile(id: string): Promise<boolean> {
+    const result = await db
+      .delete(profiles)
+      .where(eq(profiles.id, id));
+    return result.rowCount! > 0;
+  }
+
+  async getUserProfiles(userId: string): Promise<Profile[]> {
+    return db
+      .select()
+      .from(profiles)
+      .where(eq(profiles.userId, userId))
+      .orderBy(desc(profiles.createdAt));
+  }
+
+  // Tip operations
+  async createTip(tip: InsertTip): Promise<Tip> {
+    const tipData = {
+      ...tip,
+      ipHash: tip.ipHash || hashIp('0.0.0.0'), // Default if not provided
+    };
+
+    const [createdTip] = await db
       .insert(tips)
-      .values(insertTip)
+      .values(tipData)
       .returning();
-    return tip;
+    return createdTip;
   }
 
   async getTip(id: string): Promise<Tip | undefined> {
-    const [tip] = await db.select().from(tips).where(eq(tips.id, id));
+    const [tip] = await db
+      .select()
+      .from(tips)
+      .where(eq(tips.id, id))
+      .limit(1);
     return tip;
   }
 
-  async updateTipStatus(id: string, status: string, paymentIntentId?: string): Promise<Tip> {
+  async updateTipStatus(id: string, status: string, processedAt?: Date): Promise<Tip | undefined> {
     const updateData: any = { status };
-    if (paymentIntentId) {
-      updateData.paymentIntentId = paymentIntentId;
+    if (processedAt) {
+      updateData.processedAt = processedAt;
     }
-    
-    const [tip] = await db
+
+    const [updatedTip] = await db
       .update(tips)
       .set(updateData)
       .where(eq(tips.id, id))
       .returning();
-    return tip;
+    return updatedTip;
   }
 
-  async getWorkerTips(workerId: string, limit = 50): Promise<Tip[]> {
-    return await db
+  async getProfileTips(profileId: string, limit = 50): Promise<Tip[]> {
+    return db
       .select()
       .from(tips)
-      .where(eq(tips.workerId, workerId))
+      .where(eq(tips.profileId, profileId))
       .orderBy(desc(tips.createdAt))
       .limit(limit);
   }
 
-  async getWorkerDailyStats(workerId: string, date = new Date()): Promise<{
-    totalTips: number;
-    totalAmount: string;
-    avgAmount: string;
-  }> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const result = await db
-      .select({
-        totalTips: count(tips.id),
-        totalAmount: sql<string>`COALESCE(SUM(${tips.amount}), 0)`,
-        avgAmount: sql<string>`COALESCE(AVG(${tips.amount}), 0)`,
-      })
-      .from(tips)
-      .where(
-        and(
-          eq(tips.workerId, workerId),
-          eq(tips.status, 'completed'),
-          gte(tips.createdAt, startOfDay),
-          sql`${tips.createdAt} <= ${endOfDay}`
-        )
-      );
-
-    const [stats] = result;
-    return {
-      totalTips: stats?.totalTips || 0,
-      totalAmount: stats?.totalAmount || '0',
-      avgAmount: stats?.avgAmount || '0',
-    };
-  }
-
-  // Analytics
-  async updateDailyAnalytics(workerId: string, date: Date): Promise<void> {
-    const stats = await this.getWorkerDailyStats(workerId, date);
-    
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    
-    // Get QR scan count for the day
-    const [qrScanStats] = await db
-      .select({
-        scans: count(qrScans.id),
-        conversions: count(sql`CASE WHEN ${qrScans.convertedToTip} = true THEN 1 END`),
-      })
-      .from(qrScans)
-      .where(
-        and(
-          eq(qrScans.workerId, workerId),
-          gte(qrScans.createdAt, startOfDay)
-        )
-      );
-
-    const conversionRate = qrScanStats.scans > 0 
-      ? (qrScanStats.conversions / qrScanStats.scans) * 100 
-      : 0;
-
-    // Upsert analytics record
-    await db
-      .insert(analytics)
-      .values({
-        workerId,
-        date: startOfDay,
-        totalTips: stats.totalTips,
-        totalAmount: stats.totalAmount,
-        avgTipAmount: stats.avgAmount,
-        qrScans: qrScanStats.scans || 0,
-        conversionRate: conversionRate.toString(),
-      })
-      .onConflictDoUpdate({
-        target: [analytics.workerId, analytics.date],
-        set: {
-          totalTips: stats.totalTips,
-          totalAmount: stats.totalAmount,
-          avgTipAmount: stats.avgAmount,
-          qrScans: qrScanStats.scans || 0,
-          conversionRate: conversionRate.toString(),
-        },
-      });
-  }
-
-  async getWorkerAnalytics(workerId: string, days = 30): Promise<Analytics[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    
-    return await db
+  // Analytics operations
+  async getProfileAnalytics(profileId: string, startDate: Date, endDate: Date): Promise<Analytics[]> {
+    return db
       .select()
       .from(analytics)
       .where(
         and(
-          eq(analytics.workerId, workerId),
-          gte(analytics.date, startDate)
+          eq(analytics.profileId, profileId),
+          gte(analytics.date, startDate),
+          lt(analytics.date, endDate)
         )
       )
-      .orderBy(desc(analytics.date));
+      .orderBy(analytics.date);
   }
 
-  // QR Scans
-  async recordQrScan(insertScan: InsertQrScan): Promise<QrScan> {
-    const [scan] = await db
-      .insert(qrScans)
-      .values(insertScan)
-      .returning();
-    return scan;
-  }
+  async updateDailyAnalytics(profileId: string, date: Date): Promise<void> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
 
-  async markQrScanConverted(scanId: string, tipId: string): Promise<void> {
+    // Get daily stats
+    const [dailyStats] = await db
+      .select({
+        totalTips: count(tips.id),
+        totalAmount: sum(tips.amount),
+        avgTipAmount: avg(tips.amount),
+      })
+      .from(tips)
+      .where(
+        and(
+          eq(tips.profileId, profileId),
+          gte(tips.createdAt, startOfDay),
+          lt(tips.createdAt, endOfDay),
+          eq(tips.status, 'completed')
+        )
+      );
+
+    // Get QR scan count
+    const [scanStats] = await db
+      .select({
+        qrScans: count(qrScans.id),
+      })
+      .from(qrScans)
+      .where(
+        and(
+          eq(qrScans.profileId, profileId),
+          gte(qrScans.createdAt, startOfDay),
+          lt(qrScans.createdAt, endOfDay)
+        )
+      );
+
+    // Calculate conversion rate
+    const conversionRate = scanStats.qrScans > 0 
+      ? (Number(dailyStats.totalTips) / scanStats.qrScans) * 100 
+      : 0;
+
+    // Upsert daily analytics
     await db
+      .insert(analytics)
+      .values({
+        profileId,
+        date: startOfDay,
+        totalTips: Number(dailyStats.totalTips) || 0,
+        totalAmount: dailyStats.totalAmount?.toString() || '0',
+        avgTipAmount: dailyStats.avgTipAmount?.toString() || '0',
+        qrScans: scanStats.qrScans || 0,
+        conversionRate: conversionRate.toFixed(2),
+      })
+      .onConflictDoUpdate({
+        target: [analytics.profileId, analytics.date],
+        set: {
+          totalTips: Number(dailyStats.totalTips) || 0,
+          totalAmount: dailyStats.totalAmount?.toString() || '0',
+          avgTipAmount: dailyStats.avgTipAmount?.toString() || '0',
+          qrScans: scanStats.qrScans || 0,
+          conversionRate: conversionRate.toFixed(2),
+        },
+      });
+  }
+
+  // Event tracking
+  async trackEvent(event: InsertEvent): Promise<Event> {
+    const eventData = {
+      ...event,
+      ipHash: event.ipHash || hashIp('0.0.0.0'),
+    };
+
+    const [createdEvent] = await db
+      .insert(events)
+      .values(eventData)
+      .returning();
+    return createdEvent;
+  }
+
+  async getProfileEvents(profileId: string, eventType?: string, limit = 100): Promise<Event[]> {
+    const conditions = [eq(events.profileId!, profileId)];
+    if (eventType) {
+      conditions.push(eq(events.eventType, eventType));
+    }
+
+    return db
+      .select()
+      .from(events)
+      .where(and(...conditions))
+      .orderBy(desc(events.createdAt))
+      .limit(limit);
+  }
+
+  // QR scan tracking
+  async trackQrScan(scan: InsertQrScan): Promise<QrScan> {
+    const scanData = {
+      ...scan,
+      ipHash: scan.ipHash || hashIp('0.0.0.0'),
+    };
+
+    const [createdScan] = await db
+      .insert(qrScans)
+      .values(scanData)
+      .returning();
+    return createdScan;
+  }
+
+  async updateQrScanConversion(scanId: string, tipId: string): Promise<QrScan | undefined> {
+    const [updatedScan] = await db
       .update(qrScans)
       .set({
         convertedToTip: true,
         tipId,
       })
-      .where(eq(qrScans.id, scanId));
+      .where(eq(qrScans.id, scanId))
+      .returning();
+    return updatedScan;
   }
-}
 
-// Add payment verification methods to DatabaseStorage
-class EnhancedDatabaseStorage extends DatabaseStorage {
-  // In-memory storage for payment verification (demo purposes)
-  private paymentIntents = new Map<string, any>();
-  
-  async createPaymentIntent(paymentIntent: any): Promise<any> {
-    const intent = {
-      ...paymentIntent,
-      createdAt: new Date(),
-      updatedAt: new Date()
+  // Ad impressions
+  async trackImpression(impression: InsertImpression): Promise<Impression> {
+    const impressionData = {
+      ...impression,
+      ipHash: impression.ipHash || hashIp('0.0.0.0'),
     };
-    this.paymentIntents.set(paymentIntent.paymentId, intent);
-    return intent;
+
+    const [createdImpression] = await db
+      .insert(impressions)
+      .values(impressionData)
+      .returning();
+    return createdImpression;
   }
 
-  async getPaymentIntent(paymentId: string): Promise<any> {
-    return this.paymentIntents.get(paymentId) || null;
-  }
-
-  async updatePaymentStatus(paymentId: string, status: string): Promise<void> {
-    const intent = this.paymentIntents.get(paymentId);
-    if (intent) {
-      intent.status = status;
-      intent.updatedAt = new Date();
-      this.paymentIntents.set(paymentId, intent);
-    }
+  async updateImpressionClick(impressionId: string): Promise<Impression | undefined> {
+    const [updatedImpression] = await db
+      .update(impressions)
+      .set({ clicked: true })
+      .where(eq(impressions.id, impressionId))
+      .returning();
+    return updatedImpression;
   }
 }
 
-export const storage = new EnhancedDatabaseStorage();
+export const storage = new DatabaseStorage();
