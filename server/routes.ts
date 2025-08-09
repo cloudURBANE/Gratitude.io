@@ -107,20 +107,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Review interaction tracking
+  // Enhanced review interaction tracking with service rating
   app.post("/api/review-interactions", async (req, res) => {
     try {
-      const { workerId, platform, rating, hasText } = req.body;
+      const { workerId, platform, rating, hasText, reviewText, serviceRating, tipAmount } = req.body;
       
-      // In a real app, this would save to database
-      // For demo, we'll just return success
+      // Comprehensive review tracking
+      const reviewData = {
+        id: `review-${Date.now()}`,
+        workerId: workerId || 'demo-worker',
+        platform: platform || 'tiplink',
+        rating: parseInt(rating) || serviceRating || 5,
+        hasText: hasText || (reviewText && reviewText.length > 0),
+        reviewText: reviewText || '',
+        serviceRating: parseInt(serviceRating) || 5,
+        tipAmount: parseFloat(tipAmount) || 0,
+        timestamp: new Date().toISOString(),
+        validated: true
+      };
+
+      // Store in temporary memory for demo
+      console.log('Review interaction tracked:', reviewData);
+      
       res.json({ 
         success: true,
-        message: "Review interaction tracked successfully" 
+        message: "Review interaction tracked successfully",
+        reviewId: reviewData.id,
+        rating: reviewData.rating,
+        validated: reviewData.serviceRating >= 4 // Valid if 4+ stars
       });
     } catch (error: any) {
       console.error("Error tracking review interaction:", error);
-      res.status(500).json({ message: "Error tracking review interaction: " + error.message });
+      res.status(500).json({ 
+        message: "Error tracking review interaction: " + error.message 
+      });
     }
   });
 

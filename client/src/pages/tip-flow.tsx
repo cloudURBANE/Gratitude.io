@@ -45,6 +45,8 @@ export default function TipFlow() {
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'processing' | 'completed' | 'failed' | 'expired'>('pending');
   const [paymentId, setPaymentId] = useState<string>('');
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [serviceRating, setServiceRating] = useState<number>(0);
+  const [reviewText, setReviewText] = useState<string>('');
 
   // Demo worker data
   const demoWorker: Worker = {
@@ -173,6 +175,19 @@ export default function TipFlow() {
       setVerificationStatus(updatedVerification.status);
       
       if (updatedVerification.status === 'completed') {
+        // Store rating and review for the success screen
+        if (serviceRating > 0) {
+          try {
+            localStorage.setItem('tiplink-service-rating', JSON.stringify({
+              rating: serviceRating,
+              review: reviewText,
+              workerName: worker?.name,
+              timestamp: Date.now()
+            }));
+          } catch (e) {
+            console.warn('Failed to store service rating:', e);
+          }
+        }
         setCurrentStep('review');
         setProcessingComplete(true);
         setRedirecting(false);
@@ -497,7 +512,7 @@ export default function TipFlow() {
           </motion.div>
         )}
 
-        {/* Step 2: Payment Method */}
+        {/* Step 2: Payment Method - Appreciation Focus */}
         {currentStep === "payment" && !redirecting && (
           <motion.div
             key="payment"
@@ -513,20 +528,99 @@ export default function TipFlow() {
             className="min-h-screen flex flex-col justify-center px-4"
           >
             <div className="max-w-md mx-auto w-full">
-              {/* Amount display */}
+              {/* Appreciation Header */}
               <div className="text-center mb-8">
-                <div className="text-5xl font-bold mb-2">${selectedAmount}</div>
-                <div className="text-text-secondary">for {worker.name}</div>
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent-start to-accent-end mx-auto mb-4 flex items-center justify-center">
+                  <span className="text-3xl">💝</span>
+                </div>
+                <h2 className="text-2xl font-bold mb-2">Thank You for Your Kindness!</h2>
+                <p className="text-text-secondary mb-1">
+                  Your ${selectedAmount} tip means so much to {worker?.name}
+                </p>
+                <p className="text-sm text-text-secondary">
+                  Tips help hardworking people like {worker?.name} make a living
+                </p>
               </div>
 
-              {/* Payment methods */}
+              {/* Service Rating for Validation */}
+              <GlassCard className="p-4 mb-6">
+                <p className="text-sm text-text-secondary mb-3 text-center">How was your service experience?</p>
+                <div className="flex justify-center space-x-2 mb-3">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      onClick={() => setServiceRating(star)}
+                      className={`text-2xl transition-all ${
+                        star <= (serviceRating || 0) 
+                          ? 'text-yellow-400 scale-110' 
+                          : 'text-gray-400 hover:text-yellow-300'
+                      }`}
+                    >
+                      ⭐
+                    </button>
+                  ))}
+                </div>
+                {serviceRating >= 4 && (
+                  <motion.p 
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-xs text-green-400 text-center mb-3"
+                  >
+                    Excellent! This helps {worker?.name} get more customers.
+                  </motion.p>
+                )}
+                {serviceRating >= 4 && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <textarea
+                      value={reviewText}
+                      onChange={(e) => setReviewText(e.target.value)}
+                      placeholder="Share what made your experience great (optional)"
+                      className="w-full p-2 text-sm bg-glass border border-glass-border rounded-md text-text-primary placeholder-text-secondary resize-none"
+                      rows={2}
+                      maxLength={150}
+                    />
+                    <div className="text-xs text-text-secondary mt-1 text-right">
+                      {reviewText.length}/150
+                    </div>
+                  </motion.div>
+                )}
+              </GlassCard>
+
+              {/* Payment Methods */}
+              <div className="text-center mb-4">
+                <h3 className="text-lg font-medium mb-1">Choose Your Payment Method</h3>
+                <p className="text-sm text-text-secondary">Quick and secure ways to show appreciation</p>
+              </div>
+
               <GlassCard className="p-6">
                 <PaymentDock
                   amount={selectedAmount}
                   worker={worker}
-                  onPaymentSelect={(method: string) => handlePaymentSelect(method as PayMethod)}
+                  onPaymentSelect={(method: string) => {
+                    // Validate rating before proceeding
+                    if (serviceRating === 0) {
+                      toast({
+                        title: "Please rate your experience",
+                        description: "Help us know how the service was before tipping",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    handlePaymentSelect(method as PayMethod);
+                  }}
                 />
               </GlassCard>
+
+              {/* Trust indicators */}
+              <div className="mt-6 text-center">
+                <p className="text-xs text-text-secondary">
+                  🔒 Secure payments • 💯 Goes directly to {worker?.name}
+                </p>
+              </div>
             </div>
           </motion.div>
         )}
