@@ -1,6 +1,39 @@
 export type PayMethod = "cashapp" | "venmo" | "zelle" | "stripe";
 
-export function buildPayUrl(opts: {
+// Updated buildPayUrl function compatible with existing tip-flow.tsx
+export function buildPayUrl(method: PayMethod, amount: number, worker: any): string {
+  switch (method) {
+    case 'venmo':
+      if (worker?.venmoHandle) {
+        const handle = worker.venmoHandle.replace(/^@/, '');
+        return `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(handle)}&amount=${amount}&note=${encodeURIComponent('Tip for great service!')}`;
+      }
+      return `https://venmo.com/?amount=${amount}`;
+        
+    case 'cashapp':
+      if (worker?.cashappHandle) {
+        const handle = worker.cashappHandle.replace(/^\$/, '');
+        return `https://cash.app/$${encodeURIComponent(handle)}/${amount}`;
+      }
+      return `https://cash.app/`;
+        
+    case 'zelle':
+      if (worker?.zelleHandle || worker?.zelleEmail) {
+        const recipient = worker.zelleHandle || worker.zelleEmail;
+        return `zelle://payment?amount=${amount}&recipient=${encodeURIComponent(recipient)}&note=${encodeURIComponent(`Tip for ${worker.name}`)}`;
+      }
+      return `https://www.zellepay.com/`;
+        
+    case 'stripe':
+      return '/checkout';
+      
+    default:
+      return '/checkout';
+  }
+}
+
+// Keep the original buildPayUrl with options for backwards compatibility
+export function buildPayUrlWithOptions(opts: {
   method: PayMethod;
   handles: { cashAppHandle?: string; venmoHandle?: string; zelleHandle?: string; stripeLink?: string };
   amount: number;
@@ -25,11 +58,9 @@ export function buildPayUrl(opts: {
   }
   
   if (method === "stripe") {
-    // Return Stripe payment intent URL - will be handled by existing flow
     return `/api/create-payment-intent`;
   }
   
-  // Zelle requires modal with QR/phone/email
   return null;
 }
 

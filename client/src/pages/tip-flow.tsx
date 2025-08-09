@@ -6,7 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import GlassCard from "@/components/glass-card";
 import QuickTip from "@/components/quick-tip";
-import SmartDock from "@/components/smart-dock";
+import PaymentDock from "@/components/payment-dock";
 import SnakeGame from "@/components/snake-game";
 import { buildPayUrl, defaultPayMethod, type PayMethod } from "@/lib/snake-pay";
 
@@ -154,7 +154,7 @@ export default function TipFlow() {
     }
 
     // Build payment URL and redirect immediately
-    const payUrl = buildPayUrl(method, selectedAmount, worker);
+    const payUrl = worker ? buildPayUrl(method, selectedAmount, worker) : null;
     
     if (method === 'stripe') {
       // For Stripe, we need to create a checkout session first
@@ -168,7 +168,7 @@ export default function TipFlow() {
         const data = await response.json();
         if (data.clientSecret) {
           // Redirect to Stripe checkout
-          window.location.href = `/checkout?client_secret=${data.clientSecret}&amount=${selectedAmount}&worker=${worker.handle}`;
+          window.location.href = `/checkout?client_secret=${data.clientSecret}&amount=${selectedAmount}&worker=${worker?.handle}`;
           return;
         }
       } catch (error) {
@@ -183,6 +183,16 @@ export default function TipFlow() {
       }
     } else {
       // For other methods, redirect to payment app immediately
+      if (!payUrl) {
+        toast({
+          title: "Payment Error",
+          description: "Payment method not available. Please try another method.",
+          variant: "destructive",
+        });
+        setRedirecting(false);
+        return;
+      }
+      
       try {
         window.location.href = payUrl;
         
@@ -192,10 +202,14 @@ export default function TipFlow() {
             toast({
               title: "Open Payment App",
               description: `Tap to open ${method === 'venmo' ? 'Venmo' : method === 'cashapp' ? 'Cash App' : 'Zelle'}`,
-              action: {
-                label: "Try Again",
-                onClick: () => window.open(payUrl, '_blank')
-              }
+              action: (
+                <button
+                  onClick={() => payUrl && window.open(payUrl, '_blank')}
+                  className="px-3 py-1 bg-accent-start text-white rounded text-sm"
+                >
+                  Try Again
+                </button>
+              )
             });
             setRedirecting(false);
           }
@@ -406,12 +420,10 @@ export default function TipFlow() {
 
               {/* Payment methods */}
               <GlassCard className="p-6">
-                <h2 className="text-xl font-semibold mb-6 text-center">Send tip with</h2>
-                
-                <SmartDock
+                <PaymentDock
                   amount={selectedAmount}
                   worker={worker}
-                  onPaymentMethodSelect={(method: string) => handlePaymentSelect(method as PayMethod)}
+                  onPaymentSelect={(method: string) => handlePaymentSelect(method as PayMethod)}
                 />
               </GlassCard>
             </div>

@@ -732,52 +732,28 @@ export default function SnakeGame({ worker, onTipEarned, className = "" }: Snake
         </button>
       </div>
 
-      {/* Payment methods */}
+      {/* Tip earned indicator */}
       {tipAmount > 0 && (
-        <>
-          <div className="text-sm text-text-secondary mb-2">Send with:</div>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {paymentMethods.map(payMethod => (
-              <button
-                key={payMethod.id}
-                onClick={() => setMethod(payMethod.id as PayMethod)}
-                className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
-                  method === payMethod.id
-                    ? 'bg-accent-start text-white'
-                    : 'bg-glass hover:bg-glass-border border border-glass-border text-text-primary'
-                }`}
-              >
-                <span>{payMethod.icon}</span>
-                <span>{payMethod.name}</span>
-              </button>
-            ))}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-4"
+        >
+          <div className="text-center p-4 bg-gradient-to-r from-green-500/20 to-accent-start/20 rounded-lg border border-green-500/30">
+            <div className="text-lg font-semibold text-green-400 mb-1">
+              ${tipAmount} Earned! 🎉
+            </div>
+            <div className="text-sm text-text-secondary mb-3">
+              Tip amount will be used in payment flow
+            </div>
+            <button
+              onClick={() => onTipEarned(tipAmount)}
+              className="px-4 py-2 bg-accent-start hover:bg-accent-end rounded-lg text-white font-medium transition-colors"
+            >
+              Continue to Payment
+            </button>
           </div>
-
-          {/* Pay button */}
-          <motion.button
-            onClick={handlePayNow}
-            disabled={tipAmount === 0}
-            className="w-full py-3 bg-gradient-to-r from-accent-start to-accent-end rounded-lg text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all relative overflow-hidden"
-            animate={tipAmount > 0 ? {
-              boxShadow: [
-                "0 4px 20px rgba(139, 69, 255, 0.3)",
-                "0 8px 35px rgba(139, 69, 255, 0.5)",
-                "0 4px 20px rgba(139, 69, 255, 0.3)"
-              ]
-            } : {}}
-            transition={{
-              boxShadow: {
-                duration: 3,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }
-            }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            Send ${tipAmount}
-          </motion.button>
-        </>
+        </motion.div>
       )}
 
       {/* Game Status */}
