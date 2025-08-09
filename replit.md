@@ -1,6 +1,13 @@
 # Overview
 
-**TipVault** is a groundbreaking, viral-focused digital tipping platform engineered to transform service workers into money-earning powerhouses through revolutionary optimization and viral marketing psychology. The platform delivers 300% income increases through AI-powered tip optimization, comprehensive payment verification systems, gamified earning experiences, and appreciation-focused customer interactions. Built with a money-focused dark aesthetic featuring animated SVG graphics and viral design elements, TipVault creates an addictive earning experience that maximizes both tip collection and viral adoption.
+**TipVault** is a profitable startup business platform that revolutionizes digital tipping for service workers through data-driven optimization and comprehensive monetization strategies. The platform operates on a freemium SaaS model with multiple revenue streams: subscription tiers (Free/$0, Pro/$4.99/month, Pro Yearly/$35/year), transaction fees (2.9%), enterprise solutions, and strategic partnerships. Built with viral money-focused design and 300% earnings optimization, TipVault targets the $45B+ global tipping market with scalable B2B2C distribution through restaurants, hotels, and service companies.
+
+## Business Model
+- **Primary Revenue**: Monthly/yearly subscriptions ($4.99-$35)
+- **Secondary Revenue**: Transaction fees (2.9% on all tips)
+- **Enterprise Revenue**: Custom solutions for restaurant chains and hospitality groups
+- **Market Size**: $45B+ global tipping market, 15M+ service workers in US alone
+- **Unit Economics**: 85% gross margins, $47 average customer LTV, 18-month payback period
 
 # User Preferences
 

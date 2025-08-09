@@ -15,6 +15,8 @@ import Dashboard from "@/pages/dashboard";
 import Analytics from "@/pages/analytics";
 import QRGenerator from "@/pages/qr-generator";
 import ProfileSettings from "@/pages/profile-settings";
+import Pricing from "@/pages/pricing";
+import BusinessDashboard from "@/pages/business-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -22,6 +24,8 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/business" component={BusinessDashboard} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/u/:handle" component={TipFlow} />
       <Route path="/u/:handle/checkout" component={Checkout} />

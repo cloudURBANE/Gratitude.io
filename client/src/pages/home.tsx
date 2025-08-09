@@ -97,12 +97,16 @@ export default function Home() {
           >
             <h2 className="text-3xl font-bold text-white">Ready to Transform Your Tips?</h2>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold">
-                Start Earning More
-              </Button>
-              <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10">
-                Learn More
-              </Button>
+              <Link href="/pricing">
+                <Button size="lg" className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-semibold">
+                  Start Earning More
+                </Button>
+              </Link>
+              <Link href="/business">
+                <Button variant="outline" size="lg" className="border-white/20 text-white hover:bg-white/10">
+                  Business Dashboard
+                </Button>
+              </Link>
             </div>
           </motion.div>
         </motion.div>
