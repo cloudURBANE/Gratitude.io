@@ -15,7 +15,7 @@ import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
 import TipPreset from "@/components/tip-preset";
 import { PaymentMethodWithIcon } from "@/components/payment-app-icons";
-import ThumbDial from "@/components/thumb-dial";
+import FlawlessThumbDial from "@/components/flawless-thumb-dial";
 import OneTapRepeat from "@/components/one-tap-repeat";
 import WhisperBoost from "@/components/whisper-boost";
 import ReturnFlowReviews from "@/components/return-flow-reviews";
@@ -349,7 +349,7 @@ export default function TipPage() {
             <h3 className="text-lg font-medium text-text-primary mb-6 text-center">
               Say thanks in 2 taps
             </h3>
-            <ThumbDial
+            <FlawlessThumbDial
               onAmountChange={(amount) => {
                 setSelectedAmount(amount);
                 setCustomAmount("");
