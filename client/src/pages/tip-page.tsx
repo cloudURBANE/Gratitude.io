@@ -18,6 +18,7 @@ import { PaymentMethodWithIcon } from "@/components/payment-app-icons";
 import HoldToTip from "@/components/hold-to-tip";
 import SmartDock from "@/components/smart-dock";
 import MicroImpactBar from "@/components/micro-impact-bar";
+import SnakeGame from "@/components/snake-game";
 import OneTapRepeat from "@/components/one-tap-repeat";
 import SimpleWhisperBoost from "@/components/simple-whisper-boost";
 import ReturnToReview from "@/components/return-to-review";
@@ -63,6 +64,7 @@ export default function TipPage() {
   const [showReviewPrompt, setShowReviewPrompt] = useState(false);
   const [showZelleModal, setShowZelleModal] = useState(false);
   const [showOneTapRepeat, setShowOneTapRepeat] = useState(false);
+  const [showSnakeGame, setShowSnakeGame] = useState(false);
   const [showReturnFlowReviews, setShowReturnFlowReviews] = useState(false);
   const [whisperBoostEnabled, setWhisperBoostEnabled] = useState(false);
 
@@ -345,8 +347,8 @@ export default function TipPage() {
           </GlassCard>
         </div>
 
-        {/* Hold-to-Tip - hidden when showing One-Tap Repeat */}
-        {!showOneTapRepeat && (
+        {/* Hold-to-Tip - hidden when showing One-Tap Repeat or Snake Game */}
+        {!showOneTapRepeat && !showSnakeGame && (
           <div className="mb-6">
             <HoldToTip
               onAmountChange={(amount) => {
@@ -359,8 +361,53 @@ export default function TipPage() {
           </div>
         )}
 
-        {/* Micro Impact Bar */}
-        {selectedAmount && selectedAmount > 0 && (
+        {/* Snake Game */}
+        {showSnakeGame && !showOneTapRepeat && (
+          <div className="mb-6">
+            <SnakeGame
+              worker={worker}
+              onTipEarned={(amount, method) => {
+                setSelectedAmount(amount);
+                setSelectedPaymentMethod(method);
+                // Auto-trigger payment flow
+                setTimeout(() => {
+                  handleSendTip();
+                }, 500);
+              }}
+            />
+          </div>
+        )}
+
+        {/* Game mode toggle */}
+        {!showOneTapRepeat && (
+          <div className="flex justify-center mb-6">
+            <div className="bg-glass backdrop-blur-md border border-glass-border rounded-lg p-1 flex">
+              <button
+                onClick={() => setShowSnakeGame(false)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  !showSnakeGame
+                    ? 'bg-accent-start text-white shadow-md'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Hold to Tip
+              </button>
+              <button
+                onClick={() => setShowSnakeGame(true)}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  showSnakeGame
+                    ? 'bg-accent-start text-white shadow-md'
+                    : 'text-text-secondary hover:text-text-primary'
+                }`}
+              >
+                Snake Game
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Micro Impact Bar - only show for Hold to Tip mode */}
+        {!showSnakeGame && selectedAmount && selectedAmount > 0 && (
           <MicroImpactBar
             amount={selectedAmount}
             workerName={worker?.name || 'this worker'}
@@ -368,13 +415,15 @@ export default function TipPage() {
           />
         )}
 
-        {/* Smart Dock */}
-        <SmartDock
-          amount={getCurrentAmount() || 0}
-          worker={worker}
-          onPaymentMethodSelect={handlePaymentMethodSelect}
-          className="mb-6"
-        />
+        {/* Smart Dock - only show for Hold to Tip mode */}
+        {!showSnakeGame && (
+          <SmartDock
+            amount={getCurrentAmount() || 0}
+            worker={worker}
+            onPaymentMethodSelect={handlePaymentMethodSelect}
+            className="mb-6"
+          />
+        )}
 
         {/* Whisper Boost - optional $1 add-on */}
         <SimpleWhisperBoost

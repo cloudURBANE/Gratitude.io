@@ -1,0 +1,438 @@
+Fire idea. Let’s drop a mini Snake into your app where each food = $1 tip and the Pay button deep-links into Cash App/Venmo/Zelle/Card with the total prefilled. Super quick, clean, and fun.
+
+Below are two drop-in files for your Next.js scaffold you downloaded:
+	•	lib/pay.ts – tiny helper to build deep links
+	•	app/u/[handle]/play/page.tsx – the game page (try /u/jordan/play)
+
+⸻
+
+1) lib/pay.ts
+
+// lib/pay.ts
+export type PayMethod = "cashapp" | "venmo" | "zelle" | "card";
+
+export function buildPayUrl(opts: {
+  method: PayMethod;
+  handles: { cashapp?: string; venmo?: string; zelle?: string; stripeLink?: string };
+  amount: number;
+  note?: string;
+}): string | null {
+  const { method, handles, amount, note } = opts;
+  const centsFixed = Math.max(0, Number(amount || 0)).toFixed(2).replace(/\.00$/, ""); // "12.50" -> Cash App accepts "12.5/12"
+  if (method === "cashapp" && handles.cashapp) {
+    const tag = handles.cashapp.replace(/^\$/, "");
+    return `https://cash.app/$${encodeURIComponent(tag)}/${centsFixed}`;
+  }
+  if (method === "venmo" && handles.venmo) {
+    const u = handles.venmo.replace(/^@/, "");
+    const q = new URLSearchParams({
+      txn: "pay",
+      amount: String(amount),
+      note: note ? note : ""
+    });
+    return `https://venmo.com/${encodeURIComponent(u)}?${q.toString()}`;
+  }
+  if (method === "card" && handles.stripeLink) {
+    return handles.stripeLink; // Stripe payment link
+  }
+  // Zelle has no reliable deep link—show a modal with QR/phone/email instead
+  return null;
+}
+
+// VERY light platform hint for default ordering
+export function defaultMethod(): PayMethod {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() : "";
+  if (ua.includes("android")) return "cashapp";
+  if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("mac os")) return "card";
+  return "venmo";
+}
+
+
+⸻
+
+2) app/u/[handle]/play/page.tsx
+
+// app/u/[handle]/play/page.tsx
+"use client";
+
+import * as React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import HaloGlow from "@/components/halo-glow";
+import Modal from "@/components/modal";
+import CopyField from "@/components/copy-field";
+import { Button } from "@/components/button";
+import { CashIcon, CardIcon, VenmoIcon, ZelleIcon, EditIcon, ShareIcon } from "@/components/icons";
+import { buildPayUrl, defaultMethod } from "@/lib/pay";
+
+type Profile = {
+  name: string;
+  role: string;
+  city: string;
+  venmo?: string;
+  cashapp?: string;
+  zelle?: string;        // phone or email
+  stripeLink?: string;   // Stripe Payment Link
+};
+
+const DEMO: Profile = {
+  name: "Jordan M.",
+  role: "Barista & Shift Lead",
+  city: "Dallas, TX",
+  venmo: "@jordan-coffee",
+  cashapp: "$jordanbrews",
+  zelle: "214-555-0147",
+  stripeLink: "https://pay.example.com/jordan",
+};
+
+type PayMethod = "cashapp" | "venmo" | "zelle" | "card";
+
+// --- Snake config ---
+const COLS = 18;
+const ROWS = 24;
+const TICK_MS_BASE = 140; // speed; gets slightly faster with score
+const DOLLARS_PER_FOOD = 1; // $1 per food eaten per your idea
+
+type Cell = { x: number; y: number };
+type Dir = "up" | "down" | "left" | "right";
+
+export default function SnakeTipPage({ params }: { params: { handle: string } }) {
+  const profile = DEMO; // In real app, fetch by handle
+  const [score, setScore] = useState(0);
+  const [dir, setDir] = useState<Dir>("right");
+  const [alive, setAlive] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const [method, setMethod] = useState<PayMethod>(defaultMethod());
+  const [showZelle, setShowZelle] = useState(false);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const dpr = typeof window !== "undefined" ? Math.max(1, Math.min(window.devicePixelRatio || 1, 2)) : 1;
+
+  const [snake, setSnake] = useState<Cell[]>(() => [
+    { x: 4, y: 12 }, { x: 3, y: 12 }, { x: 2, y: 12 }
+  ]);
+  const [food, setFood] = useState<Cell>(() => randFood([{ x: 4, y: 12 }, { x: 3, y: 12 }, { x: 2, y: 12 }]));
+
+  // Resize canvas responsively
+  const [tile, dims] = useMemo(() => {
+    const cssW = Math.min(420, typeof window !== "undefined" ? window.innerWidth - 32 : 360);
+    const size = Math.floor(cssW / COLS);
+    return [size, { cssW: size * COLS, cssH: size * ROWS }];
+  }, []);
+
+  // Game loop
+  useEffect(() => {
+    if (!alive || paused) return;
+    let anim: number;
+    let last = performance.now();
+    const tickBase = Math.max(80, TICK_MS_BASE - score * 3);
+
+    const loop = (t: number) => {
+      if (t - last >= tickBase) {
+        step();
+        last = t;
+      }
+      anim = requestAnimationFrame(loop);
+    };
+    anim = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(anim);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alive, paused, dir, score, snake]);
+
+  // Draw
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const ctx = c.getContext("2d");
+    if (!ctx) return;
+
+    // Retina scale
+    c.width = Math.floor(dims.cssW * dpr);
+    c.height = Math.floor(dims.cssH * dpr);
+    c.style.width = `${dims.cssW}px`;
+    c.style.height = `${dims.cssH}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // background (subtle)
+    ctx.fillStyle = "rgba(255,255,255,0.04)";
+    ctx.fillRect(0, 0, dims.cssW, dims.cssH);
+
+    // grid (very subtle)
+    ctx.strokeStyle = "rgba(255,255,255,0.06)";
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= COLS; x++) {
+      ctx.beginPath();
+      ctx.moveTo(x * tile, 0);
+      ctx.lineTo(x * tile, dims.cssH);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= ROWS; y++) {
+      ctx.beginPath();
+      ctx.moveTo(0, y * tile);
+      ctx.lineTo(dims.cssW, y * tile);
+      ctx.stroke();
+    }
+
+    // food
+    roundedRect(ctx, food.x * tile + 4, food.y * tile + 4, tile - 8, tile - 8, 6, "#22D3EE", "#7C3AED");
+
+    // snake
+    snake.forEach((s, i) => {
+      const isHead = i === 0;
+      const x = s.x * tile + 2, y = s.y * tile + 2, w = tile - 4, h = tile - 4;
+      const fill = isHead ? "#ffffff" : "rgba(255,255,255,0.85)";
+      const glow = isHead ? "rgba(124,58,237,0.55)" : "rgba(34,211,238,0.35)";
+      // soft glow
+      ctx.save();
+      ctx.shadowColor = glow;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = fill;
+      roundFill(ctx, x, y, w, h, 8);
+      ctx.restore();
+    });
+  }, [snake, food, tile, dims, dpr]);
+
+  // Controls: keyboard
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (k === "arrowup" || k === "w") turn("up");
+      if (k === "arrowdown" || k === "s") turn("down");
+      if (k === "arrowleft" || k === "a") turn("left");
+      if (k === "arrowright" || k === "d") turn("right");
+      if (k === " " || k === "enter") setPaused(p => !p);
+      if (k === "r") reset();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dir]);
+
+  // Controls: swipe
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    let sx = 0, sy = 0, active = false;
+    const onStart = (e: TouchEvent) => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; active = true; };
+    const onMove = (e: TouchEvent) => {
+      if (!active) return;
+      const t = e.touches[0];
+      const dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dx) > 28 || Math.abs(dy) > 28) {
+        if (Math.abs(dx) > Math.abs(dy)) turn(dx > 0 ? "right" : "left");
+        else turn(dy > 0 ? "down" : "up");
+        active = false;
+      }
+    };
+    const onEnd = () => { active = false; };
+    c.addEventListener("touchstart", onStart, { passive: true });
+    c.addEventListener("touchmove", onMove, { passive: true });
+    c.addEventListener("touchend", onEnd);
+    return () => {
+      c.removeEventListener("touchstart", onStart);
+      c.removeEventListener("touchmove", onMove);
+      c.removeEventListener("touchend", onEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dir]);
+
+  function turn(next: Dir) {
+    setDir((d) => {
+      if ((d === "left" && next === "right") || (d === "right" && next === "left")) return d;
+      if ((d === "up" && next === "down") || (d === "down" && next === "up")) return d;
+      return next;
+    });
+  }
+
+  function step() {
+    setSnake((prev) => {
+      const head = prev[0];
+      const nx = wrapX(head.x + (dir === "right" ? 1 : dir === "left" ? -1 : 0));
+      const ny = wrapY(head.y + (dir === "down" ? 1 : dir === "up" ? -1 : 0));
+      const newHead = { x: nx, y: ny };
+
+      // collision with self?
+      if (prev.some((p) => p.x === nx && p.y === ny)) {
+        setAlive(false);
+        return prev;
+      }
+
+      // food?
+      if (nx === food.x && ny === food.y) {
+        setScore((s) => s + 1);
+        const grown = [newHead, ...prev]; // grow (no pop)
+        setFood(randFood(grown));
+        return grown;
+      }
+
+      // normal move
+      const moved = [newHead, ...prev.slice(0, prev.length - 1)];
+      return moved;
+    });
+  }
+
+  function wrapX(x: number) { return (x + COLS) % COLS; }
+  function wrapY(y: number) { return (y + ROWS) % ROWS; }
+
+  function reset() {
+    setSnake([{ x: 4, y: 12 }, { x: 3, y: 12 }, { x: 2, y: 12 }]);
+    setFood(randFood([{ x: 4, y: 12 }, { x: 3, y: 12 }, { x: 2, y: 12 }]));
+    setDir("right");
+    setScore(0);
+    setAlive(true);
+    setPaused(false);
+  }
+
+  const tipAmount = score * DOLLARS_PER_FOOD;
+  const note = `Snake tip x${score}`;
+  const payUrl = buildPayUrl({
+    method,
+    handles: { cashapp: profile.cashapp, venmo: profile.venmo, zelle: profile.zelle, stripeLink: profile.stripeLink },
+    amount: tipAmount,
+    note
+  });
+
+  function payNow() {
+    // Save last (for One-Tap Repeat patterns later)
+    try { localStorage.setItem(`tiplink:${params.handle}:last`, JSON.stringify({ amount: tipAmount, method })); } catch {}
+    if (method === "zelle") {
+      setShowZelle(true);
+      return;
+    }
+    if (!payUrl) return;
+    // Try app handoff → if blocked, they'll see the provider web page
+    window.location.href = payUrl;
+  }
+
+  function share() {
+    const url = typeof window !== "undefined" ? window.location.href : "";
+    if (navigator.share) navigator.share({ title: `Tip ${profile.name}`, url }).catch(()=>{});
+    else navigator.clipboard.writeText(url);
+  }
+
+  return (
+    <main className="mx-auto max-w-md px-4 py-8">
+      <div className="relative glass p-5 overflow-hidden">
+        <HaloGlow />
+        <header className="flex items-center gap-3">
+          <div className="h-12 w-12 rounded-full bg-gradient-to-br from-accentFrom to-accentTo grid place-items-center font-bold text-ink">J</div>
+          <div>
+            <h1 className="text-xl font-semibold leading-tight">{profile.name}</h1>
+            <p className="text-white/70 text-sm">{profile.role} • {profile.city}</p>
+          </div>
+          <div className="ml-auto flex items-center gap-2">
+            <Link href={`/u/${params.handle}`} className="btn-ghost px-3 py-2" aria-label="Back to Tip page">
+              <EditIcon className="h-5 w-5" /> {/* reusing icon; acts as back control in demo */}
+            </Link>
+            <button onClick={share} className="btn-ghost px-3 py-2" aria-label="Share link">
+              <ShareIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </header>
+
+        <section className="mt-4">
+          <div className="flex items-baseline justify-between">
+            <div>
+              <div className="text-white/80 text-sm">Each food = $1</div>
+              <div className="text-3xl font-bold tracking-tight">${tipAmount}</div>
+              <div className="text-white/60 text-xs mt-1">Score: {score}</div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setPaused(p => !p)} className="pill">{paused ? "Resume" : "Pause"}</button>
+              <button onClick={reset} className="pill">Reset</button>
+            </div>
+          </div>
+
+          {/* Canvas */}
+          <div className="mt-3 rounded-xl overflow-hidden border border-white/10">
+            <canvas ref={canvasRef} width={dims.cssW * dpr} height={dims.cssH * dpr} style={{ width: dims.cssW, height: dims.cssH }} />
+          </div>
+
+          {!alive && (
+            <div className="mt-3 text-center text-white/80">
+              <div className="text-lg font-semibold">Game over</div>
+              <div className="text-sm">You earned ${tipAmount}. Play again or tip now.</div>
+            </div>
+          )}
+        </section>
+
+        {/* Payment dock */}
+        <section className="mt-5">
+          <p className="text-white/80">Pay with</p>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button className={`btn-ghost ${method === "cashapp" ? "ring-2 ring-accentTo" : ""}`} onClick={() => setMethod("cashapp")}>
+              <CashIcon className="h-5 w-5 mr-2" /> Cash App
+            </button>
+            <button className={`btn-ghost ${method === "venmo" ? "ring-2 ring-accentTo" : ""}`} onClick={() => setMethod("venmo")}>
+              <VenmoIcon className="h-5 w-5 mr-2" /> Venmo
+            </button>
+            <button className={`btn-ghost ${method === "zelle" ? "ring-2 ring-accentTo" : ""}`} onClick={() => setMethod("zelle")}>
+              <ZelleIcon className="h-5 w-5 mr-2" /> Zelle
+            </button>
+            <button className={`btn-ghost ${method === "card" ? "ring-2 ring-accentTo" : ""}`} onClick={() => setMethod("card")}>
+              <CardIcon className="h-5 w-5 mr-2" /> Card
+            </button>
+          </div>
+
+          <Button className="w-full mt-4" onClick={payNow}>
+            Tip ${tipAmount || 0}
+          </Button>
+          <p className="text-xs text-white/60 mt-2">We’ll send you to the app you chose with the amount ready.</p>
+        </section>
+      </div>
+
+      {/* Zelle modal */}
+      <Modal isOpen={showZelle} onClose={() => setShowZelle(false)} title="Pay with Zelle">
+        <p className="text-white/80">Open your banking app’s Zelle and enter the amount:</p>
+        <div className="text-2xl font-semibold mt-2">${tipAmount}</div>
+        <CopyField label="Zelle (phone/email)" value={profile.zelle || ""} />
+      </Modal>
+    </main>
+  );
+}
+
+// ---- helpers ----
+function randFood(blocked: Cell[]): Cell {
+  while (true) {
+    const x = Math.floor(Math.random() * COLS);
+    const y = Math.floor(Math.random() * ROWS);
+    if (!blocked.some(b => b.x === x && b.y === y)) return { x, y };
+  }
+}
+
+function roundFill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number, c1: string, c2: string) {
+  const grd = ctx.createLinearGradient(x, y, x + w, y + h);
+  grd.addColorStop(0, c1);
+  grd.addColorStop(1, c2);
+  ctx.fillStyle = grd;
+  roundFill(ctx, x, y, w, h, r);
+}
+
+
+⸻
+
+How to use
+	1.	Add both files into your project:
+	•	lib/pay.ts
+	•	app/u/[handle]/play/page.tsx
+	2.	npm run dev → open http://localhost:3000/u/jordan/play
+	3.	Eat food to increase $. Tap a payment method, then Tip $X to deep-link into the app.
+
+Notes
+	•	$1 per food is hardcoded (change DOLLARS_PER_FOOD to adjust).
+	•	Zelle intentionally shows a modal (no reliable deep link).
+	•	This page reuses your glass theme + icons, is mobile-first, retina-crisp, keyboard and touch friendly.
+	•	You can later add a “Play to X dollars” toggle for customers, or cap it at e.g. $10 for speed.
+
+Want me to wire this into your main Tip page (e.g., a “Play to Tip” button on /u/[handle]) and add One-Tap Repeat after they pay?
