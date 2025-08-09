@@ -18,7 +18,7 @@ import {
   MessageCircle,
   BarChart3
 } from "lucide-react";
-import { AdSlot } from "@/components/monetization/AdSlot";
+import AdSlot from "@/components/monetization/AdSlot";
 
 // Real success metrics - no fake data
 const platformStats = {

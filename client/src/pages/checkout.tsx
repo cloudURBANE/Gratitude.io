@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useToast } from "@/hooks/use-toast";
+import AdSlot from "@/components/monetization/AdSlot";
 
 const checkoutSchema = z.object({
   email: z.string().email("Valid email required"),
@@ -365,6 +366,15 @@ export default function Checkout() {
                     You can cancel anytime before your trial ends.
                   </div>
                 </form>
+
+                {/* Strategic ad placement for additional revenue */}
+                <div className="mt-8">
+                  <AdSlot 
+                    placement="checkout_upsell"
+                    onImpressionTracked={(adId) => console.log('Checkout ad impression:', adId)}
+                    onAdClicked={(adId) => console.log('Checkout ad clicked:', adId)}
+                  />
+                </div>
               </Card>
             </motion.div>
           </div>
