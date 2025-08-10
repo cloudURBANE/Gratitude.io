@@ -48,41 +48,38 @@ export default function WelcomeDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-900 text-white">
-      {/* TipVault Header */}
-      <div className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 via-blue-500/10 to-purple-500/10" />
-        <div className="relative backdrop-blur-xl bg-black/20 border-b border-white/10">
-          <div className="container mx-auto px-4 py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl flex items-center justify-center">
-                  <DollarSign className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold bg-gradient-to-r from-green-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-                    TipVault
-                  </h1>
-                  <p className="text-white/60 text-xs">Professional Tip Platform</p>
-                </div>
+    <div className="min-h-screen text-white relative">
+      {/* Neo-Glass Header with View Transitions */}
+      <header className="neo-card sticky top-0 z-50 border-b border-white/5" style={{ animationName: 'neo-enter' }}>
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="neo-btn w-12 h-12 p-0 flex items-center justify-center">
+                <DollarSign className="w-7 h-7" />
               </div>
-              
-              <div className="flex items-center gap-3">
-                <Badge className="bg-gradient-to-r from-green-500 to-blue-500 text-white border-0">
-                  <Crown className="w-3 h-3 mr-1" />
-                  Free Plan
-                </Badge>
-                <Link href="/account-settings">
-                  <Button variant="outline" size="sm" className="border-white/20 text-white/80 hover:bg-white/10">
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </Button>
-                </Link>
+              <div>
+                <h1 className="text-2xl font-bold">
+                  TipVault
+                </h1>
+                <p className="text-xs opacity-70">Professional Tip Platform</p>
               </div>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Badge className="neo-btn px-3 py-1 text-xs">
+                <Crown className="w-3 h-3 mr-1" />
+                Free Plan
+              </Badge>
+              <Link href="/account-settings">
+                <Button variant="outline" size="sm" className="neo-btn text-sm">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
       <div className="container mx-auto px-4 py-8 max-w-6xl">
         {/* Welcome Section */}

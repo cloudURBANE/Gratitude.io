@@ -48,22 +48,27 @@ export default function Landing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Header Navigation */}
-      <header className="relative z-20 p-6">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="text-2xl font-bold text-white">TipVault</div>
+    <div className="min-h-screen relative">
+      {/* Neo-Glass Header */}
+      <header className="neo-card sticky top-0 z-50 border-b border-white/5">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-3">
+            <div className="neo-btn w-12 h-12 p-0 flex items-center justify-center">
+              <DollarSign className="w-7 h-7" />
+            </div>
+            <div className="text-2xl font-bold">TipVault</div>
+          </div>
           <div className="flex gap-3">
             <Button 
               variant="ghost" 
               onClick={() => window.location.href = '/login'}
-              className="text-white hover:bg-white/10"
+              className="neo-btn"
             >
               Sign In
             </Button>
             <Button 
               onClick={() => window.location.href = '/signup'}
-              className="bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700"
+              className="neo-btn"
             >
               Get Started
             </Button>
@@ -71,32 +76,30 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <div className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-teal-600/20 animate-pulse" />
-        
+      {/* Hero Section with Neo-Glass Design */}
+      <div className="relative overflow-hidden py-20">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
-          className="relative z-10 text-center py-20"
+          className="relative z-10 text-center px-4 scroll-reveal"
         >
-          <Badge variant="secondary" className="mb-4 bg-purple-600/20 text-purple-200 border-purple-500/30">
+          <Badge className="neo-btn mb-6 px-4 py-2">
             ✨ Professional Tip Management Platform
           </Badge>
           
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-white via-purple-200 to-teal-200 bg-clip-text text-transparent">
+          <h1 className="mb-6">
             TipVault
           </h1>
           
-          <p className="text-xl md:text-2xl text-gray-300 mb-8 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl md:text-2xl opacity-80 mb-8 max-w-3xl mx-auto leading-relaxed">
             The professional platform designed to optimize digital tipping for service workers through intelligent technology and data-driven insights.
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
             <Button 
               size="lg"
-              className="bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white px-8 py-4 text-lg"
+              className="neo-btn px-8 py-4 text-lg"
               onClick={handleGetStarted}
               onMouseEnter={() => setIsHovered(true)}
               onMouseLeave={() => setIsHovered(false)}
@@ -113,7 +116,7 @@ export default function Landing() {
             <Button 
               variant="outline" 
               size="lg"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800 px-8 py-4 text-lg"
+              className="neo-btn px-8 py-4 text-lg opacity-80"
               onClick={() => window.location.href = '/pricing'}
             >
               View Pricing

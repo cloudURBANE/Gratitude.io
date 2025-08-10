@@ -1,0 +1,179 @@
+Alright RACK — here’s a tighter, more modern spec that keeps your “pure web standards” vibe but upgrades it with the newest CSS & platform powers. I kept everything lean, performance-first, and actually shippable.
+
+Neo-Glass Vault 2.0 (no frameworks)
+
+Platform upgrades (why they matter)
+	•	View Transitions API for seamless page/section swaps (SPA or MPA). Smooth cross-fade or keyed morphs without libraries.  ￼ ￼ ￼
+	•	Scroll-Driven Animations (scroll-timeline, animation-timeline) for declarative, jank-free scroll effects.  ￼ ￼ ￼
+	•	Anchor Positioning to “tether” elements (tooltips, quick actions, menus) directly in CSS. No popper lib needed.  ￼ ￼ ￼
+	•	Popover API for overlays/modals with built-in accessibility and ::backdrop.  ￼ ￼ ￼
+	•	Color 4/5/6 features: oklch(), color-mix(), contrast-color(), color(display-p3 …), @media (color-gamut: p3). Gives richer glass, better legibility, auto light/dark text.  ￼ ￼
+	•	Motion & layout polish: @starting-style for crisp enter transitions, dynamic viewport units (svh/dvh) for mobile chrome, content-visibility for huge paint wins.  ￼ ￼
+	•	Selectors & tokens: :has() for parent-aware states; @property to type CSS custom properties (safer theming).  ￼ ￼ ￼
+
+⸻
+
+Design system (style + personality, app-wide)
+
+1) Color & glass tokens
+
+Use registered custom properties so the browser knows types (animates smoothly, clamps values).
+
+@property --brand-hue { syntax: '<number>'; inherits: true; initial-value: 280; }
+@property --elev { syntax: '<number>'; inherits: false; initial-value: 2; } /* 1–6 */
+
+:root {
+  /* Wide-gamut first, fallbacks handled by color() and oklch() */
+  --brand: oklch(65% 0.24  var(--brand-hue));
+  --bg:    oklch(18% 0.03  250);
+  --glass: color-mix(in oklch, var(--bg) 75%, white);
+
+  /* Auto-contrast text (new) */
+  --on-brand: contrast-color(var(--brand));
+}
+
+@media (color-gamut: p3) {
+  :root { --brand: color(display-p3 0.58 0.30 0.98); }
+}
+
+(OKLCH / color-mix() / contrast-color() / P3 media query are now broadly supported and perfect for glass with readable text.)  ￼
+
+2) Glass architecture
+	•	Layered panes: background gradient mesh + animated fine-grain noise; translucent cards with dual shadows (one soft spread, one sharp inner) and subtle bloom.
+	•	Blend tricks: backdrop-filter: blur(16px) saturate(140%) with optional mix-blend-mode accents on headings.  ￼
+
+.app {
+  background:
+    radial-gradient(150vh 120vh at 20% 10%, oklch(20% 0.08 260), transparent),
+    radial-gradient(120vh 160vh at 80% 70%, oklch(25% 0.10 320), transparent);
+  position: relative;
+}
+.app::before {
+  content: "";
+  position: fixed; inset: -50vmax;
+  background: url(/noise.png) repeat;
+  opacity: .05; animation: grain 1.2s steps(2) infinite;
+}
+.card {
+  --b: color-mix(in oklch, var(--glass), white 6%);
+  background: var(--b);
+  border: 1px solid color-mix(in oklch, var(--b), white 12%);
+  backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    0 20px 40px rgba(0,0,0,.25),
+    inset 0 1px 0 rgba(255,255,255,.06);
+  border-radius: 20px;
+  transform: translateZ(0); /* GPU promote */
+}
+
+3) Typography & hierarchy
+	•	Use fluid type with clamps; highlight words using :has() states (e.g., heading that has an icon gets bigger tracking).
+	•	Subtle color-temperature shifts via color-mix() between brand and neutral per section (not rainbow gradients).
+
+4) Motion language
+	•	Entry: @starting-style to define starting opacity/translate so first paint animates crisply.  ￼
+	•	Scroll: pin + reveal via scroll-timeline + animation-timeline.  ￼
+	•	Parallax: tie layers to a view timeline (no mousemove required; saves battery).
+	•	Respect prefers-reduced-motion; fall back to cross-fade only.
+
+⸻
+
+Advanced interactions (cleaner than before)
+
+View & route transitions
+	•	Wrap route/content swaps in document.startViewTransition(() => mutateDOM()) to get cross-fades or keyed anims between old/new states. Works in SPA and MPA.  ￼ ￼
+
+nav.addEventListener('click', e => {
+  e.preventDefault();
+  document.startViewTransition(async () => {
+    const html = await (await fetch(e.target.href)).text();
+    main.innerHTML = html;
+  });
+});
+
+Menus, tooltips, quick actions
+	•	Popover API for sheets, menus, command palette; style the backdrop to frosted.  ￼ ￼
+	•	Anchor Positioning to pin tooltips/menus to icons/cards, even as they move.  ￼
+
+.tooltip {
+  position-anchor: --cta; /* name defined on anchor element */
+  inset-area: top-outside; /* sit above */
+  anchor-default: auto;
+}
+
+Scroll UX
+	•	Replace manual momentum scripts with native scroll-snap for carousels/feature stacks; enhance with scroll timelines for progress rings/bars.  ￼
+
+⸻
+
+Data viz (CSS/SVG/Canvas only)
+	•	Rating morphs: SVG paths + d attribute morphing; sync to a scroll() timeline.
+	•	Progress: CSS conic-gradient rings with register tokens; switch to Canvas particles on interaction only (lazy-init via IntersectionObserver), honoring prefers-reduced-motion.  ￼
+
+⸻
+
+Performance model
+	•	Only GPU transforms (translate/scale/opacity), no layout thrash.
+	•	content-visibility: auto on off-screen sections; listen for contentvisibilityautostatechange if you need lazy-load hooks.  ￼
+	•	Containment on components; small DOM; defer Canvas until interacted.
+	•	Dynamic viewport units (dvh) to avoid mobile jumpy headers/footers.  ￼
+
+⸻
+
+Accessibility & theming switches
+	•	Light/Dark text auto with contrast-color(); wide-gamut opt-in gated by @media (color-gamut: p3).  ￼
+	•	Respect prefers-reduced-motion and prefers-contrast; use light-dark() for quick scheme swaps.  ￼
+	•	Popover and dialog-like flows get focus trapping and ESC dismiss for free.  ￼
+
+⸻
+
+Minimal starter: one page you can drop in
+
+HTML
+
+<main id="app" class="app">
+  <header class="card hero" id="home" style="anchor-name: --cta">
+    <h1>Neo-Glass Vault</h1>
+    <button popovertarget="cmd" class="btn">⌘K</button>
+  </header>
+
+  <section class="card feed" style="content-visibility:auto; contain-intrinsic-size: 800px 1px">
+    <!-- cards... snap items -->
+  </section>
+
+  <div id="cmd" popover class="card popover">Command Palette</div>
+</main>
+
+CSS (motion snippets)
+
+@scroll-timeline y { source: auto; axis: block; scroll-offsets: start 0, end 100%; }
+.reveal {
+  animation: rise 1 both;
+  animation-timeline: y; /* scroll-driven */
+  animation-range: entry 10% cover 60%;
+}
+@keyframes rise { from { opacity: 0; transform: translateY(24px) } }
+
+@starting-style {
+  .card { opacity: 0; transform: translateY(12px) }
+}
+
+(Scroll-driven animations + @starting-style give you smooth, crisp reveals without JS.)  ￼
+
+⸻
+
+What this replaces from your original
+	•	Momentum scrolling JS → native scroll-snap + scroll timelines (less jank).  ￼
+	•	Mouse parallax → timeline-driven depth that also works on touch.
+	•	Manual overlays → Popover API with ::backdrop and Anchor Positioning (cleaner, accessible).  ￼
+	•	Static gradients → OKLCH + P3 + color-mix() for tasteful chroma, auto contrast.  ￼
+
+⸻
+
+Next steps (fast)
+	1.	Drop the starter HTML/CSS above.
+	2.	Add a view-transition wrapper around nav/route updates.  ￼
+	3.	Theme via the --brand-hue token (live-update with sliders using @property type safety).  ￼
+	4.	Gate fancy motion behind prefers-reduced-motion.  ￼
+
+If you want, I’ll package this as a single file starter you can paste into Replit/Cursor and iterate from there.
