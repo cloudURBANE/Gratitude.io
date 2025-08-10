@@ -3,13 +3,11 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/components/AuthProvider";
-import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 
 import Home from "@/pages/home";
 import Landing from "@/pages/landing";
-import Login from "@/pages/login";
+import ProfileSetup from "@/pages/profile-setup";
 import TipFlow from "@/pages/tip-flow";  
 import TipPage from "@/pages/tip-page";
 import Success from "@/pages/success";
@@ -24,46 +22,30 @@ import BusinessDashboard from "@/pages/business-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-
   return (
     <Switch>
-      {/* Public routes that work regardless of auth status */}
+      {/* Landing and main flows */}
+      <Route path="/" component={Landing} />
+      <Route path="/create" component={ProfileSetup} />
+      <Route path="/dashboard" component={Dashboard} />
+      
+      {/* Tip collection */}
       <Route path="/u/:handle" component={TipPage} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/styleguide" component={StyleGuide} />
       <Route path="/tip" component={TipFlow} />
-      <Route path="/login" component={Login} />
-      <Route path="/checkout" component={Checkout} />
       <Route path="/success" component={Success} />
       
-      {/* Show loading state only when actively checking auth */}
-      {isLoading ? (
-        <Route path="/" component={() => (
-          <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-            <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full" />
-          </div>
-        )} />
-      ) : (
-        <>
-          {/* Authenticated routes */}
-          {isAuthenticated ? (
-            <>
-              <Route path="/" component={Dashboard} />
-              <Route path="/analytics" component={Analytics} />
-              <Route path="/dashboard" component={Dashboard} />
-              <Route path="/qr" component={QRGenerator} />
-              <Route path="/settings" component={ProfileSettings} />
-              <Route path="/business" component={BusinessDashboard} />
-            </>
-          ) : (
-            /* Unauthenticated home route */
-            <Route path="/" component={Landing} />
-          )}
-        </>
-      )}
+      {/* Management pages */}
+      <Route path="/analytics" component={Analytics} />
+      <Route path="/qr" component={QRGenerator} />
+      <Route path="/settings" component={ProfileSettings} />
+      <Route path="/business" component={BusinessDashboard} />
       
-      {/* Catch-all 404 route */}
+      {/* Public pages */}
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/checkout" component={Checkout} />
+      <Route path="/styleguide" component={StyleGuide} />
+      
+      {/* 404 */}
       <Route component={NotFound} />
     </Switch>
   );
@@ -78,12 +60,10 @@ function App() {
   return (
     <div className="dark">
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
       </QueryClientProvider>
     </div>
   );

@@ -3,8 +3,6 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { PageContainer } from '@/components/layout/AppLayout';
-import { LoginButton } from '@/components/LoginButton';
 import { 
   DollarSign, 
   TrendingUp, 
@@ -45,11 +43,12 @@ export default function Landing() {
   ];
 
   const handleGetStarted = () => {
-    window.location.href = '/api/login';
+    // Direct to profile creation - no auth barriers
+    window.location.href = '/create';
   };
 
   return (
-    <PageContainer className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-teal-600/20 animate-pulse" />
@@ -73,12 +72,21 @@ export default function Landing() {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-            <LoginButton 
+            <Button 
               size="lg"
               className="bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white px-8 py-4 text-lg"
+              onClick={handleGetStarted}
+              onMouseEnter={() => setIsHovered(true)}
+              onMouseLeave={() => setIsHovered(false)}
             >
-              Get Started Free
-            </LoginButton>
+              Start Earning Tips Now
+              <motion.div
+                animate={{ x: isHovered ? 5 : 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </motion.div>
+            </Button>
             
             <Button 
               variant="outline" 
@@ -146,14 +154,16 @@ export default function Landing() {
           <p className="text-gray-300 mb-6">
             Join thousands of service workers who have transformed their earning potential with TipVault's professional platform.
           </p>
-          <LoginButton 
+          <Button 
             size="lg"
             className="bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 text-white px-8 py-4"
+            onClick={handleGetStarted}
           >
-            Start Your Free Account
-          </LoginButton>
+            Create Your Tip Page
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
         </Card>
       </motion.div>
-    </PageContainer>
+    </div>
   );
 }

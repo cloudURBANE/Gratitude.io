@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProfileSchema, insertTipSchema } from "@shared/schema";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+// Removed complex auth - using simple profile-based system
 import Stripe from "stripe";
 import { createHash } from "crypto";
 
@@ -27,77 +27,59 @@ function hashIp(ip: string): string {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication
-  await setupAuth(app);
+  // Simple profile-based system - no complex auth barriers
 
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // Auth user endpoint
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  // Profile creation endpoint - no auth barriers
+  app.post('/api/profiles', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      
-      res.json({
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        profileImageUrl: user.profileImageUrl,
-        plan: user.plan
-      });
+      const profileData = req.body;
+      const profile = await storage.createProfile(profileData);
+      res.json(profile);
     } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
+      console.error("Error creating profile:", error);
+      res.status(500).json({ message: "Failed to create profile" });
     }
   });
 
-  // Server-side entitlements endpoint for clean feature gating
-  app.get('/api/entitlements', async (req, res) => {
+  // Get profile by handle
+  app.get('/api/profiles/:handle', async (req, res) => {
     try {
-      let userId = 'anonymous';
+      const { handle } = req.params;
+      const profile = await storage.getProfileByHandle(handle);
       
-      // Get user ID from authenticated session
-      if (req.isAuthenticated && req.isAuthenticated()) {
-        userId = (req.user as any)?.claims?.sub;
+      if (!profile) {
+        return res.status(404).json({ error: 'Profile not found' });
       }
       
-      // Check user subscription in database
-      const subscription = await storage.getUserSubscription(userId);
-      
-      // Calculate entitlements based on real subscription data
-      const isPro = subscription?.plan === 'pro' && 
-        subscription?.status === 'active' &&
-        (!subscription?.currentPeriodEnd || new Date(subscription.currentPeriodEnd) > new Date());
-      
+      res.json(profile);
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  });
+
+  // Simple entitlements based on profile
+  app.get('/api/entitlements', async (req, res) => {
+    try {
+      // For MVP: everyone gets basic features
       const entitlements = {
-        customBranding: isPro,
-        advancedAnalytics: isPro,
-        multiplePages: isPro,
-        prioritySupport: isPro,
-        noAds: isPro,
-        unlimitedTips: isPro || subscription?.plan === 'starter'
+        customBranding: false,
+        advancedAnalytics: false,
+        multiplePages: false,
+        prioritySupport: false,
+        noAds: true, // No ads during MVP
+        unlimitedTips: true // Everyone can receive unlimited tips
       };
       
       res.json(entitlements);
     } catch (error) {
       console.error('Error fetching entitlements:', error);
-      // Return free tier entitlements on error
-      res.json({
-        customBranding: false,
-        advancedAnalytics: false,
-        multiplePages: false,
-        prioritySupport: false,
-        noAds: false,
-        unlimitedTips: false
-      });
+      res.status(500).json({ error: 'Failed to fetch entitlements' });
     }
   });
 
@@ -169,15 +151,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Protected profile creation - user must be authenticated
-  app.post('/api/profiles', isAuthenticated, async (req: any, res) => {
+  // Simple profile creation - no auth barriers
+  app.post('/api/profiles', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const profileData = insertProfileSchema.parse({
-        ...req.body,
-        userId // Ensure profile is created for authenticated user
-      });
-      
+      const profileData = insertProfileSchema.parse(req.body);
       const profile = await storage.createProfile(profileData);
       res.status(201).json(profile);
     } catch (error) {
@@ -186,31 +163,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Protected profile update - user can only update their own profiles
-  app.put('/api/profiles/:profileId', isAuthenticated, async (req: any, res) => {
+  // Simple profile update
+  app.put('/api/profiles/:profileId', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
       const { profileId } = req.params;
       const updates = insertProfileSchema.partial().parse(req.body);
       
-      const updatedProfile = await storage.updateUserProfile(userId, profileId, updates);
+      const updatedProfile = await storage.updateProfile(profileId, updates);
       
       if (!updatedProfile) {
-        return res.status(404).json({ error: 'Profile not found or access denied' });
+        return res.status(404).json({ error: 'Profile not found' });
       }
       
       res.json(updatedProfile);
     } catch (error) {
       console.error('Error updating profile:', error);
-      res.status(400).json({ error: 'Invalid profile data or access denied' });
+      res.status(400).json({ error: 'Invalid profile data' });
     }
   });
 
-  // Get user's profiles (authenticated)
-  app.get('/api/user/profiles', isAuthenticated, async (req: any, res) => {
+  // Get profiles by session (simplified)
+  app.get('/api/user/profiles', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const profiles = await storage.getUserProfiles(userId);
+      // For MVP: return empty array (will implement session later)
+      const profiles: any[] = [];
       res.json(profiles);
     } catch (error) {
       console.error('Error fetching user profiles:', error);
