@@ -10,13 +10,24 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Loader2, DollarSign } from 'lucide-react';
+import { Loader2, DollarSign, CheckCircle, AlertCircle } from 'lucide-react';
 
 const signupSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
-  firstName: z.string().min(1, 'First name is required'),
-  lastName: z.string().min(1, 'Last name is required'),
+  email: z.string().email('Invalid email address').min(1, 'Email is required'),
+  password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128, 'Password too long')
+    .refine((password) => /[A-Z]/.test(password), 'Password must contain at least one uppercase letter')
+    .refine((password) => /[a-z]/.test(password), 'Password must contain at least one lowercase letter')
+    .refine((password) => /[0-9]/.test(password), 'Password must contain at least one number'),
+  firstName: z.string()
+    .min(1, 'First name is required')
+    .max(50, 'First name too long')
+    .refine((name) => /^[a-zA-Z\s]+$/.test(name), 'First name can only contain letters'),
+  lastName: z.string()
+    .min(1, 'Last name is required')
+    .max(50, 'Last name too long')
+    .refine((name) => /^[a-zA-Z\s]+$/.test(name), 'Last name can only contain letters'),
 });
 
 type SignupForm = z.infer<typeof signupSchema>;
@@ -24,6 +35,7 @@ type SignupForm = z.infer<typeof signupSchema>;
 export default function Signup() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<SignupForm>({
     resolver: zodResolver(signupSchema),
@@ -37,44 +49,87 @@ export default function Signup() {
 
   const signupMutation = useMutation({
     mutationFn: async (data: SignupForm) => {
-      console.log('Submitting signup data:', data);
-      const response = await apiRequest('POST', '/api/auth/signup', data);
-      const result = await response.json();
-      console.log('Signup response:', result);
-      return result;
+      setIsSubmitting(true);
+      console.log('🚀 Submitting signup data:', data);
+      
+      try {
+        const response = await apiRequest('POST', '/api/auth/signup', data);
+        const result = await response.json();
+        console.log('✅ Signup response:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Signup request failed:', error);
+        throw error;
+      } finally {
+        setIsSubmitting(false);
+      }
     },
     onSuccess: (data) => {
-      console.log('Signup successful:', data);
+      console.log('🎉 Signup successful:', data);
+      
       // Store the authentication token
       if (data.token) {
         localStorage.setItem('auth-token', data.token);
-        console.log('Token stored successfully');
+        console.log('🔑 Token stored successfully');
       }
       
       toast({
-        title: 'Account created!',
-        description: 'Welcome to TipVault. Redirecting to your dashboard...',
+        title: 'Welcome to TipVault!',
+        description: 'Your account has been created successfully.',
+        duration: 3000,
       });
       
-      // Force refetch and wait for completion before redirect
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] }).then(() => {
-        setTimeout(() => setLocation('/'), 500);
-      });
+      // Force refetch user data and redirect
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      
+      // Redirect after a short delay to show success message
+      setTimeout(() => {
+        setLocation('/profile-setup');
+      }, 1000);
     },
     onError: (error: any) => {
-      console.error('Signup error:', error);
-      console.error('Error message:', error.message);
+      console.error('💥 Signup error:', error);
+      
+      let errorMessage = 'Something went wrong. Please try again.';
+      
+      // Parse different error types
+      if (error.message.includes('409')) {
+        errorMessage = 'An account with this email already exists. Please try logging in instead.';
+      } else if (error.message.includes('400')) {
+        errorMessage = 'Please check your information and try again.';
+      } else if (error.message.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      }
+      
       toast({
         title: 'Signup failed',
-        description: error.message || 'Something went wrong',
+        description: errorMessage,
         variant: 'destructive',
+        duration: 5000,
       });
+      
+      setIsSubmitting(false);
     },
   });
 
-  const onSubmit = (data: SignupForm) => {
-    console.log('Form submitted with data:', data);
-    console.log('Form errors:', form.formState.errors);
+  const onSubmit = async (data: SignupForm) => {
+    console.log('📝 Form submitted with data:', data);
+    console.log('🔍 Form errors:', form.formState.errors);
+    
+    // Prevent double submission
+    if (isSubmitting || signupMutation.isPending) {
+      console.log('⏳ Already submitting, ignoring...');
+      return;
+    }
+    
+    // Validate form one more time
+    const validation = signupSchema.safeParse(data);
+    if (!validation.success) {
+      console.log('❌ Validation failed:', validation.error);
+      return;
+    }
+    
+    console.log('✅ Validation passed, submitting...');
     signupMutation.mutate(data);
   };
 
@@ -177,16 +232,19 @@ export default function Signup() {
               
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700"
-                disabled={signupMutation.isPending}
+                className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700 transition-all duration-200"
+                disabled={signupMutation.isPending || isSubmitting}
               >
-                {signupMutation.isPending ? (
+                {signupMutation.isPending || isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Creating account...
                   </>
                 ) : (
-                  'Create Account'
+                  <>
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Create Account
+                  </>
                 )}
               </Button>
             </form>

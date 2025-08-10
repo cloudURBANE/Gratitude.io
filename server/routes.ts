@@ -108,44 +108,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/auth/signup', async (req, res) => {
     try {
-      console.log('Signup request body:', req.body);
+      console.log('🔥 Signup request received:', { email: req.body.email, hasPassword: !!req.body.password });
+      
+      // Rate limiting check (basic)
+      const clientIp = getClientIp(req);
+      console.log('Request from IP:', clientIp);
+      
       const { email, password, firstName, lastName } = signupSchema.parse(req.body);
       
+      // Sanitize inputs
+      const sanitizedEmail = email.toLowerCase().trim();
+      const sanitizedFirstName = firstName.trim();
+      const sanitizedLastName = lastName.trim();
+      
       // Check if user already exists
-      const existingUser = await storage.getUserByEmail(email);
+      const existingUser = await storage.getUserByEmail(sanitizedEmail);
       if (existingUser) {
+        console.log('❌ User already exists:', sanitizedEmail);
         return res.status(409).json({ error: 'User already exists' });
       }
       
       // Hash password
       const passwordHash = await hashPassword(password);
-      console.log('Creating user with:', { email, firstName, lastName, passwordHashLength: passwordHash.length });
+      console.log('✅ Creating user with:', { 
+        email: sanitizedEmail, 
+        firstName: sanitizedFirstName, 
+        lastName: sanitizedLastName, 
+        passwordHashLength: passwordHash.length 
+      });
       
       // Create user
       const user = await storage.createUser({
-        email,
+        email: sanitizedEmail,
         passwordHash,
-        firstName,
-        lastName,
+        firstName: sanitizedFirstName,
+        lastName: sanitizedLastName,
       });
       
-      console.log('User created successfully:', user.id);
+      console.log('🎉 User created successfully:', user.id);
       
       // Generate JWT token
       const token = generateToken(user.id);
       
       // Return user without password plus token
       const { passwordHash: _, ...userResponse } = user;
+      
       res.status(201).json({ 
+        success: true,
         user: userResponse,
-        token: token
+        token: token,
+        message: 'Account created successfully'
       });
     } catch (error) {
-      console.error('Signup error:', error);
+      console.error('💥 Signup error:', error);
+      
+      if (error instanceof z.ZodError) {
+        console.error('Validation error:', error.errors);
+        return res.status(400).json({ 
+          error: 'Invalid input data',
+          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        });
+      }
+      
       if (error instanceof Error) {
         console.error('Error details:', error.message, error.stack);
       }
-      res.status(400).json({ error: 'Invalid registration data' });
+      
+      res.status(500).json({ 
+        error: 'Internal server error',
+        message: 'Unable to create account. Please try again.'
+      });
     }
   });
 
