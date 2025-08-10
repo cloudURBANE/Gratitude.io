@@ -11,26 +11,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     // Global error handler for unauthorized requests
-    const handleUnauthorized = () => {
-      toast({
-        title: "Session Expired",
-        description: "You have been logged out. Redirecting to login...",
-        variant: "destructive",
-      });
+    const handleUnauthorized = (showToast = true) => {
+      if (showToast) {
+        toast({
+          title: "Session Expired",
+          description: "Please sign in again to continue",
+          variant: "destructive",
+        });
+      }
       
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 2000);
+      // Only redirect if we're on a protected route
+      const currentPath = window.location.pathname;
+      const protectedRoutes = ['/dashboard', '/analytics', '/qr', '/settings', '/business'];
+      const isProtectedRoute = protectedRoutes.some(route => currentPath.startsWith(route));
+      
+      if (isProtectedRoute) {
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 1500);
+      }
     };
 
-    // Listen for fetch errors globally
+    // Enhanced fetch wrapper with better error handling
     const originalFetch = window.fetch;
     window.fetch = async (...args) => {
       try {
         const response = await originalFetch(...args);
         
+        // Handle 401 responses
         if (response.status === 401) {
-          handleUnauthorized();
+          const url = args[0]?.toString() || '';
+          // Don't show toast for auth check endpoints
+          const isAuthCheck = url.includes('/api/auth/user');
+          handleUnauthorized(!isAuthCheck);
         }
         
         return response;

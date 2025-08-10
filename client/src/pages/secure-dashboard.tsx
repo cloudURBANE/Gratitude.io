@@ -1,10 +1,9 @@
 import { useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth, type AuthUser } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageContainer } from '@/components/layout/AppLayout';
 import { 
   User, 
   Shield, 
@@ -35,11 +34,11 @@ export default function SecureDashboard() {
 
   if (isLoading) {
     return (
-      <PageContainer className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full" />
         </div>
-      </PageContainer>
+      </div>
     );
   }
 
@@ -52,7 +51,7 @@ export default function SecureDashboard() {
   };
 
   return (
-    <PageContainer className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
@@ -143,6 +142,6 @@ export default function SecureDashboard() {
           </p>
         </div>
       </Card>
-    </PageContainer>
+    </div>
   );
 }
