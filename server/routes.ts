@@ -44,6 +44,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   setupAuth(app);
   
+  // Add user population middleware for all routes
+  app.use(getCurrentUser);
+  
   // Add current user to all requests
   app.use(getCurrentUser);
 
@@ -77,12 +80,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('User created successfully:', user.id);
       
-      // Set session
+      // Set session and save it
       req.session.userId = user.id;
-      
-      // Return user without password
-      const { passwordHash: _, ...userResponse } = user;
-      res.status(201).json({ user: userResponse });
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.status(500).json({ error: 'Session creation failed' });
+        }
+        
+        // Return user without password
+        const { passwordHash: _, ...userResponse } = user;
+        res.status(201).json({ user: userResponse });
+      });
     } catch (error) {
       console.error('Signup error:', error);
       if (error instanceof Error) {
@@ -115,12 +124,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('Login successful for user:', user.id);
       
-      // Set session
+      // Set session and save it
       req.session.userId = user.id;
-      
-      // Return user without password
-      const { passwordHash: _, ...userResponse } = user;
-      res.json({ user: userResponse });
+      req.session.save((err) => {
+        if (err) {
+          console.error('Session save error:', err);
+          return res.status(500).json({ error: 'Session creation failed' });
+        }
+        
+        // Return user without password
+        const { passwordHash: _, ...userResponse } = user;
+        res.json({ user: userResponse });
+      });
     } catch (error) {
       console.error('Login error:', error);
       if (error instanceof Error) {
