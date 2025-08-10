@@ -41,12 +41,10 @@ export default function Login() {
         title: 'Welcome back!',
         description: 'Redirecting to your dashboard...',
       });
-      // Invalidate auth query to refresh user state
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
-      // Small delay to let the query refresh, then redirect
-      setTimeout(() => {
-        setLocation('/');
-      }, 500);
+      // Force refetch and wait for completion before redirect
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] }).then(() => {
+        setTimeout(() => setLocation('/'), 500);
+      });
     },
     onError: (error: any) => {
       toast({

@@ -12,7 +12,7 @@ export function useAuth() {
   return {
     user,
     isLoading,
-    isAuthenticated: !!user && !error,
+    isAuthenticated: !!user,
     isError: !!error && error.message !== "401: Not authenticated",
   };
 }

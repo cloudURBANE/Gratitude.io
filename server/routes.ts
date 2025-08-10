@@ -46,9 +46,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Add user population middleware for all routes
   app.use(getCurrentUser);
-  
-  // Add current user to all requests
-  app.use(getCurrentUser);
 
   // Health check
   app.get('/api/health', (req, res) => {
