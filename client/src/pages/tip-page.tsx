@@ -72,28 +72,28 @@ export default function TipPage() {
           <div className="space-y-4">
             <Avatar className="w-20 h-20 mx-auto">
               <AvatarFallback className="text-xl font-semibold bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                {profile.name.split(' ').map((n: string) => n[0]).join('')}
+                {(profile.displayName || profile.handle).split(' ').map((n: string) => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
             
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold">{profile.name}</h1>
+              <h1 className="text-2xl font-bold">{profile.displayName || profile.handle}</h1>
               <div className="flex items-center justify-center gap-2 text-muted-foreground">
                 <Badge variant="secondary" className="font-medium">
-                  {profile.role}
+                  {profile.jobTitle || 'Service Worker'}
                 </Badge>
-                {profile.location && (
+                {profile.businessName && (
                   <div className="flex items-center gap-1 text-sm">
                     <MapPin size={14} />
-                    {profile.location}
+                    {profile.businessName}
                   </div>
                 )}
               </div>
             </div>
             
-            {profile.bio && (
+            {profile.description && (
               <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                {profile.bio}
+                {profile.description}
               </p>
             )}
           </div>
@@ -123,7 +123,7 @@ export default function TipPage() {
                 ${selectedAmount.toFixed(2)}
               </div>
               <p className="text-sm text-muted-foreground">
-                Your tip will help {profile.name.split(' ')[0]} continue providing great service!
+                Your tip will help {(profile.displayName || profile.handle).split(' ')[0]} continue providing great service!
               </p>
             </motion.div>
           )}
@@ -138,8 +138,7 @@ export default function TipPage() {
           >
             <SmartDock 
               amount={selectedAmount}
-              profile={profile}
-              onPaymentInitiated={(method) => {
+              onPaymentInitiated={(method: string) => {
                 console.log(`Payment initiated: ${method} for $${selectedAmount}`);
               }}
             />

@@ -26,8 +26,8 @@ export default function Analytics() {
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | '90d'>('30d');
   const { entitlements, isPro } = useEntitlements();
   
-  // Mock profile ID for demo - would come from auth context
-  const profileId = 'demo-profile-123';
+  // Extract profile ID from URL params
+  const profileId = window.location.pathname.split('/')[2] || 'default';
   
   const { data: analyticsData, isLoading: analyticsLoading } = useQuery({
     queryKey: ['/api/analytics', profileId, timeframe],
@@ -43,31 +43,16 @@ export default function Analytics() {
         .then(res => res.json())
   });
 
-  // Generate mock data for demo when API returns empty
-  const mockData = {
-    totalTips: 127,
-    totalAmount: 1485.50,
-    averageTip: 11.69,
-    conversionRate: 24.5,
-    qrScans: 518,
-    peakHours: [
-      { hour: 18, tips: 23, amount: 276.50 },
-      { hour: 12, tips: 18, amount: 198.75 },
-      { hour: 19, tips: 15, amount: 189.25 }
-    ],
-    dailyTrends: Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (29 - i));
-      return {
-        date: date.toISOString().split('T')[0],
-        amount: Math.round((Math.random() * 80 + 20) * 100) / 100,
-        tips: Math.floor(Math.random() * 8) + 2,
-        avgTip: Math.round((Math.random() * 8 + 6) * 100) / 100
-      };
-    })
+  // Use real data from API or empty state
+  const data = analyticsData || {
+    totalTips: 0,
+    totalAmount: 0,
+    averageTip: 0,
+    conversionRate: 0,
+    qrScans: 0,
+    peakHours: [],
+    dailyTrends: []
   };
-
-  const data = analyticsData?.totalTips > 0 ? analyticsData : mockData;
 
   if (analyticsLoading && !data) {
     return (

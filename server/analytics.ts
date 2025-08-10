@@ -70,7 +70,7 @@ export class AnalyticsService {
       
       // Populate with actual tip data
       tips.forEach(tip => {
-        const date = new Date(tip.createdAt);
+        const date = new Date(tip.createdAt || new Date());
         const hour = date.getHours();
         const day = date.getDay();
         

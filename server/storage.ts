@@ -64,6 +64,9 @@ export interface IStorage {
   // Additional analytics methods
   getTipsByProfile(profileId: string, days?: number): Promise<Tip[]>;
   getQrScanCount(profileId: string, days?: number): Promise<number>;
+  
+  // Subscription management
+  getUserSubscription(userId: string): Promise<{ plan: string; status: string; currentPeriodEnd?: string } | null>;
 }
 
 function hashIp(ip: string): string {
@@ -392,11 +395,20 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(qrScans.profileId, profileId),
-          gte(qrScans.createdAt, startDate)
+          gte(qrScans.scannedAt, startDate)
         )
       );
     
     return Number(result.count) || 0;
+  }
+
+  // Subscription management
+  async getUserSubscription(userId: string): Promise<{ plan: string; status: string; currentPeriodEnd?: string } | null> {
+    // For now, return free tier - would be replaced with real subscription table
+    return {
+      plan: 'free',
+      status: 'active'
+    };
   }
 }
 

@@ -32,19 +32,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Server-side entitlements endpoint for clean feature gating
-  app.get('/api/user/entitlements', async (req, res) => {
+  app.get('/api/entitlements', async (req, res) => {
     try {
-      // Mock user subscription - would come from database in production
-      const subscription = {
-        plan: 'free' as const,
-        status: 'active' as const,
-        trialEndsAt: undefined,
-        currentPeriodEnd: undefined
-      };
+      // Get user ID from session (when auth is implemented)
+      const userId = req.session?.userId || 'anonymous';
       
-      // Server-side entitlements calculation - fix type comparison
-      const isPro = subscription.plan === 'pro' && 
-        subscription.status === 'active';
+      // Check user subscription in database
+      const subscription = await storage.getUserSubscription(userId);
+      
+      // Calculate entitlements based on real subscription data
+      const isPro = subscription?.plan === 'pro' && 
+        subscription?.status === 'active' &&
+        (!subscription?.currentPeriodEnd || new Date(subscription.currentPeriodEnd) > new Date());
       
       const entitlements = {
         customBranding: isPro,
@@ -52,13 +51,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         multiplePages: isPro,
         prioritySupport: isPro,
         noAds: isPro,
-        unlimitedTips: isPro
+        unlimitedTips: isPro || subscription?.plan === 'starter'
       };
       
       res.json(entitlements);
     } catch (error) {
       console.error('Error fetching entitlements:', error);
-      res.status(500).json({ error: 'Failed to fetch entitlements' });
+      // Return free tier entitlements on error
+      res.json({
+        customBranding: false,
+        advancedAnalytics: false,
+        multiplePages: false,
+        prioritySupport: false,
+        noAds: false,
+        unlimitedTips: false
+      });
     }
   });
 
