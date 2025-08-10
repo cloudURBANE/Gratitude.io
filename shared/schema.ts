@@ -30,15 +30,17 @@ export const sessions = pgTable(
 // Users table (for auth and billing)
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email", { length: 255 }).unique(),
-  firstName: varchar("first_name", { length: 100 }),
-  lastName: varchar("last_name", { length: 100 }),
+  email: varchar("email", { length: 255 }).unique().notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 100 }).notNull(),
   profileImageUrl: varchar("profile_image_url", { length: 255 }),
   plan: varchar("plan", { length: 20 }).notNull().default("free"), // 'free' | 'pro'
   stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),
   subscriptionStatus: varchar("subscription_status", { length: 20 }), // 'active' | 'cancelled' | 'past_due'
   subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  isEmailVerified: boolean("is_email_verified").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -12,48 +12,52 @@ import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Loader2, DollarSign } from 'lucide-react';
 
-const loginSchema = z.object({
+const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
 });
 
-type LoginForm = z.infer<typeof loginSchema>;
+type SignupForm = z.infer<typeof signupSchema>;
 
-export default function Login() {
+export default function Signup() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const form = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<SignupForm>({
+    resolver: zodResolver(signupSchema),
     defaultValues: {
       email: '',
       password: '',
+      firstName: '',
+      lastName: '',
     },
   });
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginForm) => {
-      const response = await apiRequest('POST', '/api/auth/login', data);
+  const signupMutation = useMutation({
+    mutationFn: async (data: SignupForm) => {
+      const response = await apiRequest('POST', '/api/auth/signup', data);
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: 'Welcome back!',
-        description: 'You have been logged in successfully.',
+        title: 'Account created!',
+        description: 'Welcome to TipVault. Let\'s create your first tip profile.',
       });
-      setLocation('/dashboard');
+      setLocation('/profile-setup');
     },
     onError: (error: any) => {
       toast({
-        title: 'Login failed',
-        description: error.message || 'Invalid email or password',
+        title: 'Signup failed',
+        description: error.message || 'Something went wrong',
         variant: 'destructive',
       });
     },
   });
 
-  const onSubmit = (data: LoginForm) => {
-    loginMutation.mutate(data);
+  const onSubmit = (data: SignupForm) => {
+    signupMutation.mutate(data);
   };
 
   return (
@@ -66,14 +70,53 @@ export default function Login() {
             </div>
             <h1 className="text-2xl font-bold text-white">TipVault</h1>
           </div>
-          <CardTitle className="text-white">Welcome back</CardTitle>
+          <CardTitle className="text-white">Create your account</CardTitle>
           <CardDescription className="text-gray-400">
-            Sign in to your account to manage your tip profiles
+            Join TipVault and start optimizing your tips today
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-300">First Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="John"
+                          className="bg-slate-700 border-slate-600 text-white"
+                          disabled={signupMutation.isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-gray-300">Last Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          placeholder="Doe"
+                          className="bg-slate-700 border-slate-600 text-white"
+                          disabled={signupMutation.isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
               <FormField
                 control={form.control}
                 name="email"
@@ -84,15 +127,16 @@ export default function Login() {
                       <Input
                         {...field}
                         type="email"
-                        placeholder="Enter your email"
+                        placeholder="john@example.com"
                         className="bg-slate-700 border-slate-600 text-white"
-                        disabled={loginMutation.isPending}
+                        disabled={signupMutation.isPending}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              
               <FormField
                 control={form.control}
                 name="password"
@@ -103,27 +147,28 @@ export default function Login() {
                       <Input
                         {...field}
                         type="password"
-                        placeholder="Enter your password"
+                        placeholder="Create a strong password"
                         className="bg-slate-700 border-slate-600 text-white"
-                        disabled={loginMutation.isPending}
+                        disabled={signupMutation.isPending}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700"
-                disabled={loginMutation.isPending}
+                disabled={signupMutation.isPending}
               >
-                {loginMutation.isPending ? (
+                {signupMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
+                    Creating account...
                   </>
                 ) : (
-                  'Sign In'
+                  'Create Account'
                 )}
               </Button>
             </form>
@@ -131,9 +176,9 @@ export default function Login() {
           
           <div className="mt-6 text-center">
             <p className="text-gray-400 text-sm">
-              Don't have an account?{' '}
-              <Link href="/signup" className="text-purple-400 hover:text-purple-300">
-                Sign up
+              Already have an account?{' '}
+              <Link href="/login" className="text-purple-400 hover:text-purple-300">
+                Sign in
               </Link>
             </p>
           </div>

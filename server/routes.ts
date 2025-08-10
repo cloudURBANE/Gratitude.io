@@ -1,10 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { setupAuth, isAuthenticated, getCurrentUser, hashPassword, verifyPassword } from "./auth";
 import { insertProfileSchema, insertTipSchema } from "@shared/schema";
-// Removed complex auth - using simple profile-based system
 import Stripe from "stripe";
 import { createHash } from "crypto";
+import { z } from "zod";
 
 // Initialize Stripe if available
 let stripe: Stripe | null = null;
@@ -26,12 +27,107 @@ function hashIp(ip: string): string {
   return createHash('sha256').update(ip + (process.env.IP_SALT || 'tipvault-salt')).digest('hex');
 }
 
+// Auth schemas
+const signupSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+});
+
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Simple profile-based system - no complex auth barriers
+  // Setup authentication
+  setupAuth(app);
+  
+  // Add current user to all requests
+  app.use(getCurrentUser);
 
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  });
+
+  // Authentication routes
+  app.post('/api/auth/signup', async (req, res) => {
+    try {
+      const { email, password, firstName, lastName } = signupSchema.parse(req.body);
+      
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ error: 'User already exists' });
+      }
+      
+      // Hash password and create user
+      const passwordHash = await hashPassword(password);
+      const user = await storage.createUser({
+        email,
+        passwordHash,
+        firstName,
+        lastName,
+      });
+      
+      // Set session
+      req.session.userId = user.id;
+      
+      // Return user without password
+      const { passwordHash: _, ...userResponse } = user;
+      res.status(201).json({ user: userResponse });
+    } catch (error) {
+      console.error('Signup error:', error);
+      res.status(400).json({ error: 'Invalid registration data' });
+    }
+  });
+
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = loginSchema.parse(req.body);
+      
+      // Find user
+      const user = await storage.getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      
+      // Verify password
+      const isValid = await verifyPassword(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+      
+      // Set session
+      req.session.userId = user.id;
+      
+      // Return user without password
+      const { passwordHash: _, ...userResponse } = user;
+      res.json({ user: userResponse });
+    } catch (error) {
+      console.error('Login error:', error);
+      res.status(400).json({ error: 'Invalid login data' });
+    }
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: 'Could not log out' });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  app.get('/api/auth/user', (req, res) => {
+    if (req.user) {
+      const { passwordHash: _, ...userResponse } = req.user;
+      res.json(userResponse);
+    } else {
+      res.status(401).json({ error: 'Not authenticated' });
+    }
   });
 
   // Profile creation endpoint - no auth barriers
@@ -151,10 +247,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Simple profile creation - no auth barriers
-  app.post('/api/profiles', async (req, res) => {
+  // Protected profile creation - requires authentication
+  app.post('/api/profiles', isAuthenticated, async (req, res) => {
     try {
-      const profileData = insertProfileSchema.parse(req.body);
+      const profileData = insertProfileSchema.parse({
+        ...req.body,
+        userId: req.session.userId // Ensure profile belongs to authenticated user
+      });
       const profile = await storage.createProfile(profileData);
       res.status(201).json(profile);
     } catch (error) {
@@ -163,18 +262,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Simple profile update
-  app.put('/api/profiles/:profileId', async (req, res) => {
+  // Protected profile update - user can only update their own profiles
+  app.put('/api/profiles/:profileId', isAuthenticated, async (req, res) => {
     try {
       const { profileId } = req.params;
       const updates = insertProfileSchema.partial().parse(req.body);
       
-      const updatedProfile = await storage.updateProfile(profileId, updates);
-      
-      if (!updatedProfile) {
-        return res.status(404).json({ error: 'Profile not found' });
+      // Verify profile ownership by getting the profile first
+      const profile = await storage.getProfile(profileId);
+      if (!profile || profile.userId !== req.session.userId) {
+        return res.status(404).json({ error: 'Profile not found or access denied' });
       }
       
+      const updatedProfile = await storage.updateProfile(profileId, updates);
       res.json(updatedProfile);
     } catch (error) {
       console.error('Error updating profile:', error);
@@ -182,11 +282,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get profiles by session (simplified)
-  app.get('/api/user/profiles', async (req, res) => {
+  // Get authenticated user's profiles
+  app.get('/api/user/profiles', isAuthenticated, async (req, res) => {
     try {
-      // For MVP: return empty array (will implement session later)
-      const profiles: any[] = [];
+      const profiles = await storage.getUserProfiles(req.session.userId);
       res.json(profiles);
     } catch (error) {
       console.error('Error fetching user profiles:', error);

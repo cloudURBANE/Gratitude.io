@@ -43,8 +43,8 @@ export default function Landing() {
   ];
 
   const handleGetStarted = () => {
-    // Direct to profile creation - no auth barriers
-    window.location.href = '/create';
+    // Direct to signup for account creation
+    window.location.href = '/signup';
   };
 
   return (
