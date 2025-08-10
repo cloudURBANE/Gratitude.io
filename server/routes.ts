@@ -79,11 +79,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Set session and save it
       req.session.userId = user.id;
+      console.log('Signup - Setting session userId:', user.id);
+      console.log('Signup - Session ID:', req.sessionID);
+      
       req.session.save((err) => {
         if (err) {
           console.error('Session save error:', err);
           return res.status(500).json({ error: 'Session creation failed' });
         }
+        
+        console.log('Signup - Session saved successfully');
+        console.log('Signup - Session data after save:', JSON.stringify(req.session, null, 2));
         
         // Return user without password
         const { passwordHash: _, ...userResponse } = user;
@@ -123,11 +129,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Set session and save it
       req.session.userId = user.id;
+      console.log('Login - Setting session userId:', user.id);
+      console.log('Login - Session ID:', req.sessionID);
+      
       req.session.save((err) => {
         if (err) {
           console.error('Session save error:', err);
           return res.status(500).json({ error: 'Session creation failed' });
         }
+        
+        console.log('Login - Session saved successfully');
+        console.log('Login - Session data after save:', JSON.stringify(req.session, null, 2));
         
         // Return user without password
         const { passwordHash: _, ...userResponse } = user;

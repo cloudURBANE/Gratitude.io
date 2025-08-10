@@ -22,9 +22,10 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: false, // Disable secure for development
+      secure: false,
       maxAge: sessionTtl,
-      sameSite: 'lax', // Add explicit sameSite setting
+      sameSite: 'lax',
+      domain: undefined, // Don't set domain for localhost
     },
   });
 }
@@ -37,7 +38,8 @@ export function setupAuth(app: Express) {
   // Enable CORS for session cookies
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Origin', 'http://localhost:5000');
+    const origin = req.headers.origin || 'http://localhost:5000';
+    res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     if (req.method === 'OPTIONS') {
@@ -68,10 +70,15 @@ export const isAuthenticated: RequestHandler = (req, res, next) => {
 
 // Get current user from session
 export const getCurrentUser: RequestHandler = async (req, res, next) => {
+  console.log('getCurrentUser middleware - session ID:', req.sessionID);
+  console.log('getCurrentUser middleware - session userId:', req.session?.userId);
+  console.log('getCurrentUser middleware - session data:', JSON.stringify(req.session, null, 2));
+  
   if (req.session && req.session.userId) {
     try {
       const user = await storage.getUser(req.session.userId);
       req.user = user;
+      console.log('User loaded from session:', user?.email);
     } catch (error) {
       console.error('Error fetching user:', error);
     }
