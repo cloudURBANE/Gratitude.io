@@ -314,16 +314,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get profile by handle
+  // Get profile by handle - serve user data directly for simplified MVP
   app.get('/api/profiles/:handle', async (req, res) => {
     try {
       const { handle } = req.params;
-      const profile = await storage.getProfileByHandle(handle);
+      console.log('Fetching profile for handle:', handle);
       
-      if (!profile) {
+      // Find user by handle directly
+      const [user] = await db.select().from(users).where(eq(users.handle, handle));
+      
+      if (!user) {
         return res.status(404).json({ error: 'Profile not found' });
       }
+
+      // Return user data formatted as profile
+      const profile = {
+        id: user.id,
+        userId: user.id,
+        displayName: `${user.firstName} ${user.lastName}`,
+        handle: user.handle,
+        jobTitle: user.jobTitle,
+        businessName: user.workplace,
+        description: user.bio,
+        venmoHandle: user.venmoHandle,
+        cashappHandle: user.cashappHandle,
+        zelleInfo: user.zelleEmail,
+        user: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email
+        }
+      };
       
+      console.log('Profile found:', profile);
       res.json(profile);
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -348,6 +371,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching entitlements:', error);
       res.status(500).json({ error: 'Failed to fetch entitlements' });
+    }
+  });
+
+  // Analytics tracking endpoints
+  app.post('/api/analytics/page-view', async (req, res) => {
+    try {
+      const { profileId, timestamp } = req.body;
+      // Track page view analytics - simple implementation for MVP
+      console.log('Page view tracked:', { profileId, timestamp });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error tracking page view:', error);
+      res.status(500).json({ error: 'Failed to track page view' });
+    }
+  });
+
+  app.post('/api/analytics/conversion', async (req, res) => {
+    try {
+      const { profileId, amount, paymentMethod } = req.body;
+      console.log('Conversion tracked:', { profileId, amount, paymentMethod });
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error tracking conversion:', error);
+      res.status(500).json({ error: 'Failed to track conversion' });
+    }
+  });
+
+  // Tip creation endpoint
+  app.post('/api/tips', async (req, res) => {
+    try {
+      const { profileId, amount, paymentMethod, rating, review, tipperName, timestamp } = req.body;
+      console.log('Tip recorded:', { profileId, amount, paymentMethod, rating, review, tipperName });
+      res.json({ success: true, id: `tip_${Date.now()}` });
+    } catch (error) {
+      console.error('Error recording tip:', error);
+      res.status(500).json({ error: 'Failed to record tip' });
     }
   });
 
