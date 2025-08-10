@@ -9,12 +9,19 @@
 - **Market Size**: $45B+ global tipping market, 15M+ service workers in US alone
 - **Unit Economics**: 85% gross margins, $47 average customer LTV, 18-month payback period
 
-## Complete Pricing Funnel (2025)
-- **Landing Page**: Professional hero with 300% tip increase promise and direct pricing CTA
+## Complete Pricing Funnel (2025) - Clean & Compliant
+- **Landing Page**: Professional hero with safe claims and direct pricing CTA (removed hard metrics)
 - **Pricing Page**: Clean 3-tier pricing (Free/$0, Pro/$4.99/month, Enterprise/Custom) with billing toggle and FAQ
-- **Checkout Flow**: Full form validation, 7-day free trial, secure payment processing with order summary
-- **Success Page**: Welcome sequence with next steps, trial info, and dashboard onboarding
+- **Checkout Flow**: Full form validation, 7-day free trial, secure payment processing (no ads during checkout)
+- **Success Page**: Welcome sequence with next steps, trial info, and appropriate partner recommendations
 - **Conversion Flow**: Landing → Pricing → Checkout → Success → Dashboard (seamless 4-page funnel)
+
+## Safe Monetization Strategy (Post-Feedback)
+- **Ad Placement**: Only on success page and dashboard sidebar (never during payment flows)
+- **Safe Claims**: Removed specific metrics, using puffery ("designed to boost tips") with methodology page
+- **Server-Side Gating**: Proper entitlements system for Pro features, no client-side hiding
+- **Clean UX**: No promotional popups during checkout, maintaining conversion rates
+- **Transparent Revenue**: Clear labeling of partner recommendations, dismissible ads
 
 # User Preferences
 

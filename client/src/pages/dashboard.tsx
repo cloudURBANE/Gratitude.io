@@ -6,6 +6,7 @@ import {
   Camera, Upload, ExternalLink, Copy, Check, Crown, Sparkles
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import AdSlot from "@/components/monetization/AdSlot";
 import GlassCard from "@/components/glass-card";
 import GradientButton from "@/components/gradient-button";
 import ImageUploader from "@/components/image-uploader";

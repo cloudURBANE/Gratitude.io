@@ -1,0 +1,87 @@
+Alright RACK—here’s a tight, no-fluff pass on what your screenshots imply + what you need to fix to scale cleanly.
+
+Red flags in your current mock (fix first)
+	•	Kill the hard claims (“300% Tip Increase”, “ROI 2,400%”, “thousands of workers”) unless you can prove them. Swap to safe puffery (“designed to help you get tipped faster”) or add a methodology page + typical-results disclosure.
+	•	No promos during checkout. Those purple popups (“Banking for Gig Workers”, “Restaurant POS Systems”) over Stripe will tank conversion and look sketchy. Show partner promos only on the post-purchase /success screen or in the dashboard.
+	•	Free page upsell box on the tip screen: make sure it never blocks the payment actions and never loads 3rd-party JS. House-only, small, dismissible.
+
+Core product logic you need (ship now)
+	•	Deep-link builder: a single util that returns the exact URL for Cash App / Venmo / Stripe card and a Zelle modal (no deep link). Include device detection + in-app browser fallback (open-in-Safari/Chrome + QR of the link).
+	•	One-Tap Repeat: store {amount, method} per handle in localStorage; if present, render “Tip again $X” as the first action.
+	•	Smart defaults: rules engine (day, hour, device) → defaultAmount, primaryMethod.
+	•	Return detector: on visibility change → slide in review chips; if payment failed (user never left), show “Open in Safari/Chrome” helper instead of ads.
+	•	Feature gating: server-side (not CSS) hide Pro features (custom branding, extra pages, analytics, no badge/ads) for Free.
+
+Pricing/plan mechanics
+	•	Pro $4.99/mo or $35/yr, 7-day trial.
+	•	Stripe: products/prices; webhook updates subscriptions atomically (idempotency key, signature verify).
+	•	Entitlements table powers UI (don’t trust client): entitlements(user_id, feature, on|off, limits).
+
+Ads (freemium) done safely
+	•	Slots: only success (return screen) + dashboard side rail. Never pre-payment.
+	•	No third-party JS on public pages. Server decides the creative; click via /r/:fillId redirect; impression via 1×1 beacon.
+	•	Waterfall: house → affiliate → (later) network.
+	•	Caps: 1 impression per session client-side + 1 per day per IP-hash server-side.
+	•	Pro: SSR gate removes the component entirely.
+
+Data model (Postgres; Prisma names for clarity)
+
+users(id, email, plan, created_at)
+profiles(id, user_id, handle UNIQUE, avatar, city, venmo, cashapp, zelle, stripe_link)
+links(id, profile_id, kind ENUM('tip','short','shift'), token UNIQUE, meta, expires_at)
+events(id, profile_id, type, ts, device, ref)           -- 'view','method_select','handoff','return','review_click'
+subs(id, user_id, stripe_sub_id, status, current_period_end)
+entitlements(id, user_id, feature, limit, enabled)
+ads(id, provider, slot, title, body, cta, url, image_url, active)
+fills(id, ad_id, handle, slot, ts, ip_hash)             -- serve record
+impressions(id, fill_id, ts)
+clicks(id, fill_id, ts)
+
+Infra + scale path
+	•	Next.js App Router on Vercel (or Replit + Node); serve /u/[handle] pages static/ISR at edge; ad choice + short-link redirect using Edge Functions.
+	•	DB: Postgres (Neon/Supabase) + Redis/KV for hot stuff (rate limits, token lookups).
+	•	Storage: S3/R2 for avatars/QRs.
+	•	Email: Postmark/Resend for receipts + magic links.
+	•	Queues: lightweight (Upstash Q/Cloudflare Queues) for webhooks, wallet pass builds, QR batch jobs.
+
+Reliability & security
+	•	Webhook idempotency (Stripe): store event_id; ignore duplicates.
+	•	Handle reservation/validation (no brand squatting; reserved list).
+	•	CSP locked down; only your domains + Stripe.
+	•	Anti-abuse: rate-limit /r/:token & /api/*, soft bans per IP-hash.
+	•	HMAC on short tokens to prevent tampering.
+
+Observability (you’ll need this by week 2)
+	•	Event funnel per handle: view → method_select → handoff → return → review_click.
+	•	Error logging for deep-link failures + in-app browser blocks.
+	•	Dash KPIs: conversion rate, time-to-handoff median, return rate, review CTR, ad RPM (free), Pro conversion.
+
+Performance budgets (keep the page “instant”)
+	•	Tip page JS ≤ 120KB gz; LCP < 1.2s on 4G; CLS = 0.
+	•	Inline SVG icons, preconnect to Stripe only on card flow.
+	•	No analytics/ads scripts on tip page; use your beacons.
+
+Enterprise/multi-location (from your pricing card)
+	•	Add orgs(id, name), locations(id, org_id), members(user_id, org_id, role), profile_location(profile_id, location_id).
+	•	Bulk QR generation job + RBAC (org_admin, member).
+	•	White-label subdomain per org (CNAME onboarding).
+
+What to change in UI now (fast wins)
+	•	Remove numerical claims; replace with safe copy.
+	•	Move all partner promos to /success and dashboard.
+	•	Make the Pro upsell on the public tip page a tiny, bottom-sheet that never overlaps payment CTAs.
+	•	Add “Play & Tip” as a secondary tab; cap game to a quick 30–45s session (or $10) so it doesn’t slow tips.
+
+10-day cut list (order matters)
+	1.	Deep-link builder + smart defaults + return detector.
+	2.	Server-side feature gating + Pro upgrade (Stripe) + webhooks.
+	3.	Event pipeline + dashboard funnel.
+	4.	AdSlot (success/dashboard only) + caps.
+	5.	Short-link/NFC tokens with TTL + HMAC.
+	6.	Legal pages + “not affiliated” line; scrub hard claims.
+	7.	Perf pass to hit budgets; in-app browser guard.
+	8.	One-Tap Repeat.
+	9.	Org/Location tables (if you want Enterprise upsell visible).
+	10.	Smoke tests for link builders (iOS/Android/in-app).
+
+If you want, I’ll generate the Prisma schema + Next.js server components for AdSlot, Entitlements, and the Stripe webhook (idempotent) so you can paste them straight into your repo.

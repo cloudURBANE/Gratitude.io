@@ -14,6 +14,7 @@ import {
   Settings,
   BarChart3
 } from "lucide-react";
+import AdSlot from "@/components/monetization/AdSlot";
 
 interface SubscriptionData {
   plan: string;
@@ -243,6 +244,21 @@ export default function Success() {
               </div>
             </div>
           </motion.div>
+
+          {/* Recommended Partner Services - Safe Ad Placement */}
+          <div className="space-y-6 pt-8 border-t border-gray-200">
+            <div className="text-center">
+              <h4 className="font-semibold text-gray-900 mb-2">Recommended for Service Workers</h4>
+              <p className="text-gray-600 text-sm">Helpful services to maximize your earnings</p>
+            </div>
+            
+            <AdSlot 
+              placement="success_partner_ads"
+              className="max-w-lg mx-auto"
+              onImpressionTracked={(adId) => console.log('Success page ad impression:', adId)}
+              onAdClicked={(adId) => console.log('Success page ad clicked:', adId)}
+            />
+          </div>
 
           {/* Support */}
           <div className="text-center space-y-4 pt-8 border-t border-gray-200">

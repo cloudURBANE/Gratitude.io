@@ -20,12 +20,12 @@ import {
 } from "lucide-react";
 import AdSlot from "@/components/monetization/AdSlot";
 
-// Real success metrics - no fake data
+// Platform metrics - typical results
 const platformStats = {
-  activeWorkers: "2,847+",
-  avgTipIncrease: "300%",
-  totalProcessed: "$1.2M+",
-  customerRating: "4.9"
+  activeWorkers: "Growing daily",
+  avgTipIncrease: "Designed to boost tips",
+  totalProcessed: "Processing securely",
+  customerRating: "Highly rated"
 };
 
 const testimonials = [
@@ -323,7 +323,7 @@ export default function Home() {
                 Ready to Transform Your Earnings?
               </h2>
               <p className="text-lg text-blue-100 max-w-2xl mx-auto">
-                Join thousands of service workers who've increased their tips by 300% with TipVault. 
+                Join service workers using TipVault to streamline their tipping experience. 
                 Start free, upgrade when ready, cancel anytime.
               </p>
             </div>
@@ -358,15 +358,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Smart Revenue Slot */}
-      <div className="container mx-auto px-6 py-8 max-w-6xl">
-        <AdSlot 
-          placement="dashboard_side" 
-          className="max-w-md mx-auto"
-          onImpressionTracked={(adId) => console.log('Ad impression:', adId)}
-          onAdClicked={(adId) => console.log('Ad clicked:', adId)}
-        />
-      </div>
+
 
       {/* Footer */}
       <footer className="bg-gray-50 border-t border-gray-200 py-12">

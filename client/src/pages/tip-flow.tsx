@@ -519,15 +519,7 @@ export default function TipFlow() {
                   </div>
                 )}
 
-                {/* Ad placement for free tier monetization */}
-                <div className="mt-8">
-                  <AdSlot 
-                    placement="tip_page_bottom"
-                    className="mb-4"
-                    onImpressionTracked={(adId) => console.log(`Tip page ad impression: ${adId}`)}
-                    onAdClicked={(adId) => console.log(`Tip page ad clicked: ${adId}`)}
-                  />
-                </div>
+
 
                 {/* Continue hint */}
                 {selectedAmount > 0 && (

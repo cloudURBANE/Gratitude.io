@@ -367,14 +367,7 @@ export default function Checkout() {
                   </div>
                 </form>
 
-                {/* Strategic ad placement for additional revenue */}
-                <div className="mt-8">
-                  <AdSlot 
-                    placement="checkout_upsell"
-                    onImpressionTracked={(adId) => console.log('Checkout ad impression:', adId)}
-                    onAdClicked={(adId) => console.log('Checkout ad clicked:', adId)}
-                  />
-                </div>
+
               </Card>
             </motion.div>
           </div>
