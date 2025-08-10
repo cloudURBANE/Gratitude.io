@@ -1,0 +1,26 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+  pgweb:
+    image: sosedoff/pgweb
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgres://dev:devpassword@db:5432/appdb?sslmode=disable
+    ports:
+      - "8081:8081"
+    command: ["--listen=0.0.0.0", "--bind=0.0.0.0", "--url", "postgres://dev:devpassword@db:5432/appdb?sslmode=disable"]
+volumes:
+  db_data:
