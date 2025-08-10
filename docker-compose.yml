@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: dashboard_postgres
+    environment:
+      POSTGRES_DB: dashboard_db
+      POSTGRES_USER: dashboard_user
+      POSTGRES_PASSWORD: dashboard_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Redis for sessions (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: dashboard_redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
