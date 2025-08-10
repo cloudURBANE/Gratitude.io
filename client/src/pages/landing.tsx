@@ -49,6 +49,28 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+      {/* Header Navigation */}
+      <header className="relative z-20 p-6">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="text-2xl font-bold text-white">TipVault</div>
+          <div className="flex gap-3">
+            <Button 
+              variant="ghost" 
+              onClick={() => window.location.href = '/login'}
+              className="text-white hover:bg-white/10"
+            >
+              Sign In
+            </Button>
+            <Button 
+              onClick={() => window.location.href = '/signup'}
+              className="bg-gradient-to-r from-purple-600 to-teal-600 hover:from-purple-700 hover:to-teal-700"
+            >
+              Get Started
+            </Button>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-teal-600/20 animate-pulse" />
