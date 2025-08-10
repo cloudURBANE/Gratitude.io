@@ -24,46 +24,47 @@ import BusinessDashboard from "@/pages/business-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
-  const { isAuthenticated, isLoading, error } = useAuth();
-
-  // Show loading state while authentication is being checked
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full" />
-      </div>
-    );
-  }
+  const { isAuthenticated, isLoading } = useAuth();
 
   return (
     <Switch>
-      {!isAuthenticated ? (
-        <>
-          <Route path="/" component={Landing} />
-          <Route path="/u/:handle" component={TipPage} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/styleguide" component={StyleGuide} />
-          <Route path="/tip" component={TipFlow} />
-          <Route path="/login" component={Login} />
-          <Route component={NotFound} />
-        </>
+      {/* Public routes that work regardless of auth status */}
+      <Route path="/u/:handle" component={TipPage} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/styleguide" component={StyleGuide} />
+      <Route path="/tip" component={TipFlow} />
+      <Route path="/login" component={Login} />
+      <Route path="/checkout" component={Checkout} />
+      <Route path="/success" component={Success} />
+      
+      {/* Show loading state only when actively checking auth */}
+      {isLoading ? (
+        <Route path="/" component={() => (
+          <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+            <div className="animate-spin w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full" />
+          </div>
+        )} />
       ) : (
         <>
-          <Route path="/" component={Dashboard} />
-          <Route path="/u/:handle" component={TipPage} />
-          <Route path="/analytics" component={Analytics} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/qr" component={QRGenerator} />
-          <Route path="/settings" component={ProfileSettings} />
-          <Route path="/business" component={BusinessDashboard} />
-          <Route path="/styleguide" component={StyleGuide} />
-          <Route path="/pricing" component={Pricing} />
-          <Route path="/checkout" component={Checkout} />
-          <Route path="/success" component={Success} />
-          <Route path="/tip" component={TipFlow} />
-          <Route component={NotFound} />
+          {/* Authenticated routes */}
+          {isAuthenticated ? (
+            <>
+              <Route path="/" component={Dashboard} />
+              <Route path="/analytics" component={Analytics} />
+              <Route path="/dashboard" component={Dashboard} />
+              <Route path="/qr" component={QRGenerator} />
+              <Route path="/settings" component={ProfileSettings} />
+              <Route path="/business" component={BusinessDashboard} />
+            </>
+          ) : (
+            /* Unauthenticated home route */
+            <Route path="/" component={Landing} />
+          )}
         </>
       )}
+      
+      {/* Catch-all 404 route */}
+      <Route component={NotFound} />
     </Switch>
   );
 }

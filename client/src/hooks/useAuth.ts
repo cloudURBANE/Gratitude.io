@@ -14,14 +14,18 @@ export function useAuth() {
     queryKey: ["/api/auth/user"],
     retry: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
   });
 
-  // User is authenticated if we have user data and no 401 error
+  // User is authenticated if we have user data and no error
   const isAuthenticated = !!user && !error;
+  
+  // Consider loading complete after first response (success or 401)
+  const authCheckComplete = !isLoading || !!error;
 
   return {
     user: user || null,
-    isLoading,
+    isLoading: !authCheckComplete,
     isAuthenticated,
     error,
   };
