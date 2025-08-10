@@ -42,7 +42,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         currentPeriodEnd: undefined
       };
       
-      // Server-side entitlements calculation
+      // Server-side entitlements calculation - fix type comparison
       const isPro = subscription.plan === 'pro' && 
         subscription.status === 'active';
       
@@ -59,6 +59,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching entitlements:', error);
       res.status(500).json({ error: 'Failed to fetch entitlements' });
+    }
+  });
+
+  // Analytics endpoints
+  app.get('/api/analytics/:profileId', async (req, res) => {
+    try {
+      const { profileId } = req.params;
+      const days = parseInt(req.query.days as string) || 30;
+      
+      // Import analytics service
+      const { analyticsService } = await import('./analytics');
+      const analytics = await analyticsService.getTipAnalytics(profileId, days);
+      
+      res.json(analytics);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      res.status(500).json({ error: 'Failed to fetch analytics' });
+    }
+  });
+
+  app.get('/api/analytics/:profileId/heatmap', async (req, res) => {
+    try {
+      const { profileId } = req.params;
+      const days = parseInt(req.query.days as string) || 30;
+      
+      const { analyticsService } = await import('./analytics');
+      const heatmapData = await analyticsService.getHeatmapData(profileId, days);
+      
+      res.json(heatmapData);
+    } catch (error) {
+      console.error('Error fetching heatmap data:', error);
+      res.status(500).json({ error: 'Failed to fetch heatmap data' });
+    }
+  });
+
+  // Tip verification endpoint
+  app.post('/api/tips/:tipId/verify', async (req, res) => {
+    try {
+      const { tipId } = req.params;
+      const { verified, method, manualConfirmation } = req.body;
+      
+      if (verified) {
+        await storage.updateTipStatus(tipId, 'completed');
+        res.json({ success: true, status: 'completed' });
+      } else {
+        await storage.updateTipStatus(tipId, 'failed');
+        res.json({ success: false, status: 'failed' });
+      }
+    } catch (error) {
+      console.error('Error verifying tip:', error);
+      res.status(500).json({ error: 'Failed to verify tip' });
     }
   });
 

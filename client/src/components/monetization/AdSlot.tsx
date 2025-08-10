@@ -1,246 +1,152 @@
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, ExternalLink, TrendingUp, DollarSign } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { adService, isFreeTier, type AdConfig } from "@/lib/ads";
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { X, ExternalLink, Star, DollarSign, TrendingUp } from 'lucide-react';
+import { useEntitlements } from '@/hooks/useEntitlements';
 
 interface AdSlotProps {
-  placement: string;
+  placement: 'success_page' | 'dashboard_side';
   className?: string;
-  onImpressionTracked?: (adId: string) => void;
-  onAdClicked?: (adId: string) => void;
 }
 
-// Enhanced ad content with real revenue potential
-const mockAdContent = {
-  tip_page_bottom: {
-    type: 'upgrade_banner',
-    title: 'Unlock Pro Features',
-    description: 'Get unlimited tip pages, custom branding, and detailed analytics to maximize earnings.',
-    cta: 'Upgrade Now',
-    color: 'blue'
-  },
-  dashboard_side: {
-    type: 'feature_promo',
-    title: 'Analytics Dashboard',
-    description: 'Track peak hours, customer patterns, and optimize your tip strategy with Pro.',
-    cta: 'See Analytics',
-    color: 'green'
-  },
-  checkout_upsell: {
-    type: 'interstitial',
-    title: 'Last Chance: Pro Trial',
-    description: 'Start your 7-day free trial now and increase tips by 300% immediately.',
-    cta: 'Start Trial',
-    color: 'purple'
-  }
-};
+export function AdSlot({ placement, className = '' }: AdSlotProps) {
+  const [isDismissed, setIsDismissed] = useState(false);
+  const { shouldShowAds } = useEntitlements();
 
-// Ad revenue partners (mock data for demo)
-const revenuePartnerAds = [
-  {
-    id: 'partner_001',
-    title: 'Restaurant POS Systems',
-    description: 'Integrate seamlessly with Square, Toast, and Clover for automatic tip tracking.',
-    cta: 'Learn More',
-    revenue: 0.45,
-    partner: 'Square'
-  },
-  {
-    id: 'partner_002', 
-    title: 'Tax Prep for Service Workers',
-    description: 'Maximize deductions and track expenses with TurboTax Self-Employed.',
-    cta: 'File Now',
-    revenue: 0.65,
-    partner: 'TurboTax'
-  },
-  {
-    id: 'partner_003',
-    title: 'Banking for Gig Workers',
-    description: 'Get paid faster with Chime\'s instant deposits and fee-free banking.',
-    cta: 'Open Account', 
-    revenue: 0.85,
-    partner: 'Chime'
-  }
-];
-
-export default function AdSlot({ 
-  placement, 
-  className = "", 
-  onImpressionTracked,
-  onAdClicked 
-}: AdSlotProps) {
-  const [adConfig, setAdConfig] = useState<AdConfig | null>(null);
-  const [currentAd, setCurrentAd] = useState<any>(null);
-  const [isVisible, setIsVisible] = useState(true);
-  const [impressionTracked, setImpressionTracked] = useState(false);
-
-  // Check if user should see ads (free tier only)
-  const showAds = isFreeTier();
-
-  useEffect(() => {
-    if (!showAds) return;
-    
-    // Safe ad placement - only success page and dashboard sidebar per feedback
-    const allowedPlacements = ['success_partner_ads', 'dashboard_side'];
-    if (!allowedPlacements.includes(placement)) {
-      return;
-    }
-    
-    // Get appropriate ad for placement
-    const config = adService.getAdForPlacement(placement, 'free');
-    if (config) {
-      setAdConfig(config);
-      
-      // Use partner ads for relevant service worker tools
-      const partnerAd = revenuePartnerAds[Math.floor(Math.random() * revenuePartnerAds.length)];
-      setCurrentAd(partnerAd);
-    }
-  }, [placement, showAds]);
-
-  useEffect(() => {
-    // Track impression once when ad loads
-    if (!impressionTracked && adConfig && currentAd && isVisible) {
-      adService.trackImpression(adConfig.id, placement);
-      setImpressionTracked(true);
-      onImpressionTracked?.(adConfig.id);
-    }
-  }, [impressionTracked, adConfig, currentAd, isVisible, placement, onImpressionTracked]);
-
-  const handleClick = () => {
-    if (adConfig && currentAd) {
-      adService.trackClick(adConfig.id, placement);
-      onAdClicked?.(adConfig.id);
-      
-      // Handle different ad types
-      if (currentAd.type === 'upgrade_banner' || currentAd.type === 'feature_promo') {
-        window.location.href = '/pricing';
-      } else if (currentAd.type === 'interstitial') {
-        window.location.href = '/checkout?plan=pro_monthly&source=ad';
-      } else if (currentAd.partner) {
-        // Would open partner links (mock for demo)
-        window.open('#', '_blank');
-      }
-    }
-  };
-
-  const handleDismiss = () => {
-    setIsVisible(false);
-    // Could track dismissal analytics here
-  };
-
-  // Safe ad placement check - only success page and dashboard sidebar
-  const allowedPlacements = ['success_partner_ads', 'dashboard_side'];
-  if (!allowedPlacements.includes(placement)) {
+  if (!shouldShowAds || isDismissed) {
     return null;
   }
 
-  // Don't render for paid users or if no ad content
-  if (!showAds || !adConfig || !currentAd || !isVisible) {
+  // Only show ads on allowed placements
+  if (!['success_page', 'dashboard_side'].includes(placement)) {
     return null;
   }
 
-  // Render different ad formats based on type
-  const renderAdContent = () => {
-    if (adConfig.type === 'interstitial') {
-      return (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
-        >
-          <Card className="max-w-md w-full p-6 bg-white">
-            <button
-              onClick={handleDismiss}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-            >
-              <X size={20} />
-            </button>
-            
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto">
-                <DollarSign size={32} className="text-purple-600" />
-              </div>
-              
-              <h3 className="text-xl font-bold text-gray-900">{currentAd.title}</h3>
-              <p className="text-gray-600">{currentAd.description}</p>
-              
-              <Button
-                onClick={handleClick}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                {currentAd.cta}
-                <ExternalLink size={16} className="ml-2" />
-              </Button>
-            </div>
-          </Card>
-        </motion.div>
-      );
+  const getAdContent = () => {
+    if (placement === 'success_page') {
+      return {
+        title: 'Partner Recommendations',
+        subtitle: 'Tools to help grow your tips',
+        ads: [
+          {
+            id: 'tiptracker',
+            title: 'TipTracker Pro',
+            description: 'Advanced analytics and earning insights for service workers',
+            cta: 'Get Free Trial',
+            badge: 'Popular',
+            icon: TrendingUp
+          },
+          {
+            id: 'earnmore',
+            title: 'EarnMore Academy',
+            description: 'Learn proven strategies to increase your tips by 40%',
+            cta: 'Start Learning',
+            badge: 'New',
+            icon: Star
+          }
+        ]
+      };
     }
 
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        className={`relative ${className}`}
-      >
-        <Card className="p-4 border border-gray-200 bg-gradient-to-r from-gray-50 to-white">
-          <button
-            onClick={handleDismiss}
-            className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={16} />
-          </button>
+    // dashboard_side placement
+    return {
+      title: 'Partner Tools',
+      subtitle: 'Boost your earnings',
+      ads: [
+        {
+          id: 'quickbooks',
+          title: 'QuickBooks Simple Start',
+          description: 'Track your tip income for taxes. Free for 3 months.',
+          cta: 'Get Started',
+          badge: 'Free Trial',
+          icon: DollarSign
+        }
+      ]
+    };
+  };
 
-          <div className="flex items-start gap-4">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-              currentAd.color === 'blue' ? 'bg-blue-100 text-blue-600' :
-              currentAd.color === 'green' ? 'bg-green-100 text-green-600' :
-              'bg-purple-100 text-purple-600'
-            }`}>
-              <TrendingUp size={20} />
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-gray-900 text-sm mb-1">
-                {currentAd.title}
-              </h3>
-              <p className="text-gray-600 text-xs leading-relaxed mb-3">
-                {currentAd.description}
-              </p>
-              
-              <Button
-                size="sm"
-                onClick={handleClick}
-                className={`text-xs ${
-                  currentAd.color === 'blue' ? 'bg-blue-600 hover:bg-blue-700' :
-                  currentAd.color === 'green' ? 'bg-green-600 hover:bg-green-700' :
-                  'bg-purple-600 hover:bg-purple-700'
-                } text-white`}
-              >
-                {currentAd.cta}
-                <ExternalLink size={12} className="ml-1" />
-              </Button>
+  const content = getAdContent();
 
-              {/* Revenue indicator for demo */}
-              {currentAd.revenue && (
-                <div className="text-xs text-gray-400 mt-2">
-                  Ad revenue: ${currentAd.revenue.toFixed(2)}
-                </div>
-              )}
-            </div>
-          </div>
-        </Card>
-      </motion.div>
-    );
+  const handleAdClick = (adId: string) => {
+    // Track ad click for analytics
+    console.log(`Ad clicked: ${adId}`);
+    // In production, this would make an API call to track the click
   };
 
   return (
-    <AnimatePresence>
-      {renderAdContent()}
-    </AnimatePresence>
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={className}
+    >
+      <Card className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-blue-200 dark:border-blue-800 relative">
+        {/* Dismissible */}
+        <button
+          onClick={() => setIsDismissed(true)}
+          className="absolute top-2 right-2 w-6 h-6 flex items-center justify-center rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-800 transition-colors"
+          aria-label="Dismiss recommendations"
+        >
+          <X className="w-3 h-3 text-gray-500" />
+        </button>
+
+        <div className="space-y-4">
+          {/* Header */}
+          <div>
+            <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+              {content.title}
+            </h3>
+            <p className="text-xs text-blue-600 dark:text-blue-300">
+              {content.subtitle}
+            </p>
+          </div>
+
+          {/* Ads */}
+          <div className="space-y-3">
+            {content.ads.map((ad) => (
+              <div
+                key={ad.id}
+                className="bg-white/60 dark:bg-gray-800/60 rounded-lg p-3 space-y-2"
+              >
+                <div className="flex items-start gap-2">
+                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <ad.icon className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {ad.title}
+                      </h4>
+                      <Badge variant="secondary" className="text-xs shrink-0">
+                        {ad.badge}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
+                      {ad.description}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  className="w-full text-xs h-8"
+                  onClick={() => handleAdClick(ad.id)}
+                >
+                  {ad.cta}
+                  <ExternalLink className="w-3 h-3 ml-1" />
+                </Button>
+              </div>
+            ))}
+          </div>
+
+          {/* Disclaimer */}
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Partner recommendations • Dismissible
+          </p>
+        </div>
+      </Card>
+    </motion.div>
   );
 }
+
+export default AdSlot;

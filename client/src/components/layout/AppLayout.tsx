@@ -1,36 +1,18 @@
-import React from 'react';
-import { cn } from '@/lib/utils';
+import { ReactNode } from 'react';
 
 interface PageContainerProps {
-  children: React.ReactNode;
-  maxWidth?: string;
+  children: ReactNode;
   className?: string;
 }
 
-export function PageContainer({ 
-  children, 
-  maxWidth = "max-w-md", 
-  className 
-}: PageContainerProps) {
+export function PageContainer({ children, className = '' }: PageContainerProps) {
   return (
-    <div className={cn(
-      "mx-auto px-4 py-6 min-h-screen",
-      maxWidth,
-      className
-    )}>
-      {children}
+    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 ${className}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {children}
+      </div>
     </div>
   );
 }
 
-interface AppLayoutProps {
-  children: React.ReactNode;
-}
-
-export function AppLayout({ children }: AppLayoutProps) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      {children}
-    </div>
-  );
-}
+export default PageContainer;

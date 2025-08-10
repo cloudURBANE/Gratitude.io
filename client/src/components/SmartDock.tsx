@@ -1,227 +1,253 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CreditCard, Smartphone, DollarSign, Zap } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Card } from '@/components/ui/card';
+import { 
+  CreditCard, 
+  Smartphone, 
+  DollarSign, 
+  Zap,
+  Check,
+  ExternalLink,
+  X
+} from 'lucide-react';
 
 interface PaymentMethod {
   id: string;
   name: string;
-  icon: React.ReactNode;
+  icon: React.ComponentType<any>;
+  color: string;
   available: boolean;
-  handle?: string;
-  description: string;
-  primaryColor: string;
-  bgColor: string;
+  recommended?: boolean;
+  deepLink?: string;
 }
 
 interface SmartDockProps {
   amount: number;
-  profile: any;
-  onPaymentInitiated: (method: string) => void;
-  className?: string;
+  onPaymentMethodSelected: (method: string, amount: number) => void;
+  onClose: () => void;
+  venmoHandle?: string;
+  cashappHandle?: string;
+  zelleHandle?: string;
 }
 
-export function SmartDock({
-  amount,
-  profile,
-  onPaymentInitiated,
-  className
+export function SmartDock({ 
+  amount, 
+  onPaymentMethodSelected, 
+  onClose,
+  venmoHandle,
+  cashappHandle,
+  zelleHandle 
 }: SmartDockProps) {
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Detect optimal payment method based on device/platform
+  // Detect device capabilities
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+
   const paymentMethods: PaymentMethod[] = [
+    {
+      id: 'stripe',
+      name: 'Credit Card',
+      icon: CreditCard,
+      color: 'bg-blue-500',
+      available: true,
+      recommended: !isMobile
+    },
     {
       id: 'venmo',
       name: 'Venmo',
-      icon: <Smartphone size={20} />,
-      available: !!profile.venmo_handle,
-      handle: profile.venmo_handle,
-      description: 'Quick & social',
-      primaryColor: 'text-blue-600',
-      bgColor: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+      icon: Smartphone,
+      color: 'bg-blue-600',
+      available: !!venmoHandle && isMobile,
+      recommended: isMobile && !!venmoHandle,
+      deepLink: venmoHandle ? `venmo://paycharge?txn=pay&recipients=${venmoHandle}&amount=${amount}&note=Tip` : undefined
     },
     {
       id: 'cashapp',
       name: 'Cash App',
-      icon: <DollarSign size={20} />,
-      available: !!profile.cashapp_handle,
-      handle: profile.cashapp_handle,
-      description: 'Instant transfer',
-      primaryColor: 'text-green-600',
-      bgColor: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+      icon: DollarSign,
+      color: 'bg-green-500',
+      available: !!cashappHandle && isMobile,
+      deepLink: cashappHandle ? `cashme://${cashappHandle}/${amount}` : undefined
     },
     {
       id: 'zelle',
       name: 'Zelle',
-      icon: <Zap size={20} />,
-      available: !!profile.zelle_info,
-      handle: profile.zelle_info,
-      description: 'Bank to bank',
-      primaryColor: 'text-purple-600',
-      bgColor: 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'
-    },
-    {
-      id: 'stripe',
-      name: 'Card',
-      icon: <CreditCard size={20} />,
-      available: true, // Always available
-      description: 'Credit/Debit card',
-      primaryColor: 'text-gray-600',
-      bgColor: 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'
+      icon: Zap,
+      color: 'bg-purple-500',
+      available: !!zelleHandle,
+      deepLink: isIOS && zelleHandle ? `zelle://send?recipient=${zelleHandle}&amount=${amount}` : undefined
     }
-  ];
+  ].filter(method => method.available);
 
-  const availableMethods = paymentMethods.filter(method => method.available);
-
-  const handlePayment = async (methodId: string) => {
-    setSelectedMethod(methodId);
+  const handleMethodSelect = async (method: PaymentMethod) => {
+    setSelectedMethod(method.id);
     setIsProcessing(true);
 
-    try {
-      if (methodId === 'stripe') {
-        // Handle Stripe payment
-        const response = await fetch('/api/tips', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            profileId: profile.id,
-            amount: amount,
-            paymentMethod: 'stripe'
-          })
-        });
-
-        const result = await response.json();
-        
-        if (result.clientSecret) {
-          // Redirect to Stripe Checkout or handle in-app
-          console.log('Stripe payment initiated:', result);
-        }
-      } else {
-        // Handle deep link payments (Venmo, CashApp, Zelle)
-        const method = availableMethods.find(m => m.id === methodId);
-        if (method) {
-          let deepLink = '';
-          
-          switch (methodId) {
-            case 'venmo':
-              deepLink = `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(method.handle!)}&amount=${amount}&note=${encodeURIComponent(`Tip for ${profile.name}`)}`;
-              break;
-            case 'cashapp':
-              deepLink = `https://cash.app/${method.handle}/${amount}`;
-              break;
-            case 'zelle':
-              // Zelle requires app-specific handling
-              deepLink = `zelle://send?recipient=${encodeURIComponent(method.handle!)}&amount=${amount}`;
-              break;
-          }
-
-          if (deepLink) {
-            // Try to open the app, fallback to web
-            window.location.href = deepLink;
-            
-            // Track the payment attempt
-            await fetch('/api/tips', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                profileId: profile.id,
-                amount: amount,
-                paymentMethod: methodId,
-                status: 'pending'
-              })
-            });
-          }
-        }
-      }
-
-      onPaymentInitiated(methodId);
-    } catch (error) {
-      console.error('Payment error:', error);
-    } finally {
+    if (method.deepLink && isMobile) {
+      // Try to open the app
+      const link = document.createElement('a');
+      link.href = method.deepLink;
+      link.click();
+      
+      // Set up fallback to app store if app doesn't open
       setTimeout(() => {
-        setIsProcessing(false);
-        setSelectedMethod(null);
-      }, 2000);
+        if (document.visibilityState === 'visible') {
+          // App didn't open, show fallback
+          const fallbackUrl = method.id === 'venmo' 
+            ? 'https://venmo.com/' 
+            : method.id === 'cashapp'
+            ? 'https://cash.app/'
+            : 'https://www.zellepay.com/';
+          window.open(fallbackUrl, '_blank');
+        }
+      }, 1000);
+    }
+
+    // Always proceed with payment selection
+    setTimeout(() => {
+      onPaymentMethodSelected(method.id, amount);
+      setIsProcessing(false);
+    }, 1500);
+  };
+
+  const getMethodDescription = (method: PaymentMethod) => {
+    switch (method.id) {
+      case 'stripe':
+        return 'Secure card payment';
+      case 'venmo':
+        return `Pay @${venmoHandle}`;
+      case 'cashapp':
+        return `Pay ${cashappHandle}`;
+      case 'zelle':
+        return `Send to ${zelleHandle}`;
+      default:
+        return '';
     }
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn("space-y-4", className)}
-    >
-      <Card className="p-6 bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm border border-white/20">
-        <div className="text-center mb-4">
-          <h3 className="text-lg font-semibold">Choose Payment Method</h3>
-          <p className="text-sm text-muted-foreground">
-            Select how you'd like to send ${amount.toFixed(2)}
-          </p>
-        </div>
-
-        <div className="grid gap-3">
-          {availableMethods.map((method) => (
-            <motion.div key={method.id} whileTap={{ scale: 0.98 }}>
-              <Button
-                variant="outline"
-                size="lg"
-                className={cn(
-                  "w-full justify-between h-auto p-4 transition-all",
-                  method.bgColor,
-                  selectedMethod === method.id && "ring-2 ring-blue-500",
-                  isProcessing && selectedMethod !== method.id && "opacity-50"
-                )}
-                onClick={() => handlePayment(method.id)}
-                disabled={isProcessing}
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4"
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-md"
+        >
+          <Card className="p-6 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border border-white/20">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Complete Your Tip
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Choose your preferred payment method
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className={method.primaryColor}>
-                    {method.icon}
-                  </div>
-                  <div className="text-left">
-                    <div className="font-semibold">{method.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {method.description}
-                    </div>
-                    {method.handle && (
-                      <div className="text-xs font-mono text-muted-foreground">
-                        {method.handle}
-                      </div>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Amount Display */}
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 rounded-lg p-4 mb-6 text-center">
+              <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+                ${amount.toFixed(2)}
+              </div>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Tip amount
+              </p>
+            </div>
+
+            {/* Payment Methods */}
+            <div className="space-y-3">
+              {paymentMethods.map((method) => (
+                <motion.button
+                  key={method.id}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleMethodSelect(method)}
+                  disabled={isProcessing && selectedMethod !== method.id}
+                  className={`
+                    w-full p-4 rounded-lg border-2 transition-all flex items-center gap-4
+                    ${selectedMethod === method.id 
+                      ? 'border-green-500 bg-green-50 dark:bg-green-900/20' 
+                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-white dark:bg-gray-800'
+                    }
+                    ${isProcessing && selectedMethod !== method.id ? 'opacity-50' : ''}
+                  `}
+                >
+                  {/* Icon */}
+                  <div className={`w-12 h-12 rounded-lg ${method.color} flex items-center justify-center flex-shrink-0`}>
+                    {selectedMethod === method.id && isProcessing ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <method.icon className="w-6 h-6 text-white" />
                     )}
                   </div>
-                </div>
-                
-                <div className="text-right">
-                  <div className="font-bold">${amount.toFixed(2)}</div>
-                  {method.id === selectedMethod && isProcessing && (
-                    <Badge variant="secondary" className="text-xs">
-                      Opening...
-                    </Badge>
-                  )}
-                </div>
-              </Button>
-            </motion.div>
-          ))}
-        </div>
 
-        {/* Optimal recommendation */}
-        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-          <div className="flex items-center gap-2 text-sm">
-            <Zap size={16} className="text-blue-600" />
-            <span className="font-medium text-blue-900 dark:text-blue-100">
-              Recommended: {availableMethods[0]?.name}
-            </span>
-            <Badge variant="secondary" className="text-xs">
-              Fastest
-            </Badge>
-          </div>
-        </div>
-      </Card>
-    </motion.div>
+                  {/* Content */}
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-gray-900 dark:text-white">
+                        {method.name}
+                      </span>
+                      {method.recommended && (
+                        <Badge className="text-xs">Recommended</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {getMethodDescription(method)}
+                    </p>
+                  </div>
+
+                  {/* Status */}
+                  <div className="flex-shrink-0">
+                    {selectedMethod === method.id ? (
+                      isProcessing ? (
+                        <div className="text-green-600 dark:text-green-400 text-sm">
+                          Processing...
+                        </div>
+                      ) : (
+                        <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      )
+                    ) : (
+                      method.deepLink && (
+                        <ExternalLink className="w-4 h-4 text-gray-400" />
+                      )
+                    )}
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+
+            {/* Helper Text */}
+            {isMobile && (
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  💡 Mobile apps will open automatically for faster payment
+                </p>
+              </div>
+            )}
+          </Card>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }

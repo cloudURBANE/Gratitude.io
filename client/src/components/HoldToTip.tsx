@@ -1,124 +1,163 @@
-import React, { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { DollarSign, Sparkles } from 'lucide-react';
 
 interface HoldToTipProps {
   onAmountSelected: (amount: number) => void;
   className?: string;
-  minAmount?: number;
-  maxAmount?: number;
 }
 
-export function HoldToTip({
-  onAmountSelected,
-  className,
-  minAmount = 1,
-  maxAmount = 50
-}: HoldToTipProps) {
-  const [isPressed, setIsPressed] = useState(false);
+export function HoldToTip({ onAmountSelected, className = '' }: HoldToTipProps) {
+  const [isHolding, setIsHolding] = useState(false);
   const [selectedAmount, setSelectedAmount] = useState(0);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const holdTimeRef = useRef<number>(0);
+  const intervalRef = useRef<NodeJS.Timeout>();
   
-  const y = useMotionValue(0);
-  const scale = useTransform(y, [-100, 0], [1.2, 1]);
-  const opacity = useTransform(y, [-100, 0], [1, 0.7]);
-  const amount = useTransform(y, [-200, 0], [maxAmount, minAmount]);
+  const progress = useMotionValue(0);
+  const scale = useTransform(progress, [0, 1], [1, 1.05]);
+  const rotateRing = useTransform(progress, [0, 1], [0, 360]);
 
-  const handleStart = useCallback(() => {
-    setIsPressed(true);
-  }, []);
-
-  const handleEnd = useCallback(() => {
-    setIsPressed(false);
-    if (selectedAmount >= minAmount) {
+  const amounts = [5, 10, 15, 20, 25, 30, 40, 50];
+  
+  const startHold = useCallback(() => {
+    if (isHolding) return;
+    
+    setIsHolding(true);
+    holdTimeRef.current = 0;
+    
+    intervalRef.current = setInterval(() => {
+      holdTimeRef.current += 50;
+      const progressValue = Math.min(holdTimeRef.current / 2000, 1); // 2 second max hold
+      progress.set(progressValue);
+      
+      // Calculate amount based on hold time
+      const amountIndex = Math.floor(progressValue * amounts.length);
+      const amount = amounts[Math.min(amountIndex, amounts.length - 1)];
+      setSelectedAmount(amount);
+      
+      if (progressValue >= 1) {
+        endHold();
+      }
+    }, 50);
+  }, [isHolding, progress]);
+  
+  const endHold = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+    
+    if (selectedAmount > 0) {
       onAmountSelected(selectedAmount);
     }
-    y.set(0);
+    
+    setIsHolding(false);
     setSelectedAmount(0);
-  }, [selectedAmount, minAmount, onAmountSelected, y]);
-
-  const handleDrag = useCallback(() => {
-    const currentAmount = Math.round(amount.get() * 4) / 4; // Round to quarters
-    setSelectedAmount(Math.max(minAmount, Math.min(maxAmount, currentAmount)));
-  }, [amount, minAmount, maxAmount]);
+    progress.set(0);
+  }, [selectedAmount, onAmountSelected, progress]);
 
   return (
-    <div className={cn("relative flex justify-center", className)}>
-      <div className="relative w-32 h-32">
-        {/* Outer ring */}
-        <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-gray-700" />
-        
-        {/* Progress ring */}
-        {isPressed && (
-          <svg className="absolute inset-0 w-full h-full -rotate-90">
-            <circle
-              cx="50%"
-              cy="50%"
-              r="60"
-              fill="none"
-              stroke="url(#gradient)"
-              strokeWidth="4"
-              strokeDasharray={`${(selectedAmount / maxAmount) * 377} 377`}
-              className="transition-all duration-150"
-            />
+    <div className={`flex flex-col items-center space-y-6 ${className}`}>
+      {/* Amount Display */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center"
+      >
+        <div className="text-4xl font-bold text-white mb-2">
+          ${selectedAmount || '0'}
+        </div>
+        <p className="text-gray-300 text-sm">
+          {isHolding ? 'Hold to increase amount' : 'Hold the button below to select tip amount'}
+        </p>
+      </motion.div>
+
+      {/* Hold Button */}
+      <div className="relative">
+        {/* Animated ring */}
+        <motion.div
+          style={{ rotate: rotateRing }}
+          className="absolute inset-0 w-32 h-32 rounded-full"
+        >
+          <svg className="w-full h-full" viewBox="0 0 100 100">
             <defs>
-              <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#3b82f6" />
-                <stop offset="50%" stopColor="#8b5cf6" />
-                <stop offset="100%" stopColor="#06b6d4" />
+              <linearGradient id="ring-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#10b981" />
+                <stop offset="50%" stopColor="#3b82f6" />
+                <stop offset="100%" stopColor="#8b5cf6" />
               </linearGradient>
             </defs>
+            <circle
+              cx="50"
+              cy="50"
+              r="48"
+              fill="none"
+              stroke="url(#ring-gradient)"
+              strokeWidth="2"
+              strokeDasharray={`${progress.get() * 301.59} 301.59`}
+              strokeLinecap="round"
+              className="transition-all duration-100"
+            />
           </svg>
-        )}
-
-        {/* Center button */}
-        <motion.div
-          ref={containerRef}
-          className="absolute inset-2 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg cursor-pointer select-none flex items-center justify-center"
-          style={{ scale, opacity }}
-          drag="y"
-          dragConstraints={{ top: -200, bottom: 0 }}
-          dragElastic={0.1}
-          onDragStart={handleStart}
-          onDragEnd={handleEnd}
-          onDrag={handleDrag}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <div className="text-white text-center">
-            {isPressed && selectedAmount > 0 ? (
-              <div>
-                <div className="text-xs font-medium">Tip</div>
-                <div className="text-lg font-bold">${selectedAmount.toFixed(2)}</div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-xs font-medium">Hold</div>
-                <div className="text-lg font-bold">& Drag</div>
-              </div>
-            )}
-          </div>
         </motion.div>
 
-        {/* Amount display */}
-        {isPressed && selectedAmount > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-center"
-          >
-            <div className="bg-black/80 text-white px-3 py-1 rounded-full text-sm font-medium">
-              ${selectedAmount.toFixed(2)}
-            </div>
-          </motion.div>
-        )}
+        {/* Main button */}
+        <motion.button
+          style={{ scale }}
+          onMouseDown={startHold}
+          onMouseUp={endHold}
+          onMouseLeave={endHold}
+          onTouchStart={startHold}
+          onTouchEnd={endHold}
+          className={`
+            relative w-32 h-32 rounded-full bg-gradient-to-br from-green-500 to-blue-600
+            shadow-2xl shadow-green-500/25 border-4 border-white/20
+            flex items-center justify-center transition-all duration-200
+            ${isHolding ? 'shadow-3xl shadow-green-500/40' : 'hover:shadow-3xl hover:shadow-green-500/30'}
+          `}
+        >
+          {/* Button content */}
+          <div className="flex flex-col items-center">
+            <DollarSign className="w-8 h-8 text-white mb-1" />
+            <span className="text-white text-xs font-semibold">
+              {isHolding ? 'HOLD' : 'HOLD TO TIP'}
+            </span>
+          </div>
+
+          {/* Sparkle effects */}
+          {isHolding && (
+            <>
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="absolute -top-2 -right-2"
+              >
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+              </motion.div>
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 }}
+                className="absolute -bottom-2 -left-2"
+              >
+                <Sparkles className="w-4 h-4 text-yellow-300" />
+              </motion.div>
+            </>
+          )}
+        </motion.button>
       </div>
 
-      {/* Instructions */}
-      <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 text-center">
-        <p className="text-xs text-muted-foreground">
-          {isPressed ? 'Release to confirm' : 'Hold and drag up to increase'}
-        </p>
+      {/* Quick amounts */}
+      <div className="grid grid-cols-4 gap-3">
+        {amounts.slice(0, 4).map((amount) => (
+          <motion.button
+            key={amount}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => onAmountSelected(amount)}
+            className="w-16 h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white font-semibold text-sm hover:bg-white/20 transition-all"
+          >
+            ${amount}
+          </motion.button>
+        ))}
       </div>
     </div>
   );

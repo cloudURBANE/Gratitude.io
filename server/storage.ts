@@ -60,6 +60,10 @@ export interface IStorage {
   // Ad impressions
   trackImpression(impression: InsertImpression): Promise<Impression>;
   updateImpressionClick(impressionId: string): Promise<Impression | undefined>;
+  
+  // Additional analytics methods
+  getTipsByProfile(profileId: string, days?: number): Promise<Tip[]>;
+  getQrScanCount(profileId: string, days?: number): Promise<number>;
 }
 
 function hashIp(ip: string): string {
@@ -356,6 +360,43 @@ export class DatabaseStorage implements IStorage {
       .where(eq(impressions.id, impressionId))
       .returning();
     return updatedImpression;
+  }
+
+  // Additional analytics methods implementation
+  async getTipsByProfile(profileId: string, days: number = 30): Promise<Tip[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    return db
+      .select()
+      .from(tips)
+      .where(
+        and(
+          eq(tips.profileId, profileId),
+          gte(tips.createdAt, startDate),
+          eq(tips.status, 'completed')
+        )
+      )
+      .orderBy(desc(tips.createdAt));
+  }
+
+  async getQrScanCount(profileId: string, days: number = 30): Promise<number> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    const [result] = await db
+      .select({
+        count: count(qrScans.id)
+      })
+      .from(qrScans)
+      .where(
+        and(
+          eq(qrScans.profileId, profileId),
+          gte(qrScans.createdAt, startDate)
+        )
+      );
+    
+    return Number(result.count) || 0;
   }
 }
 
