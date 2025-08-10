@@ -1,504 +1,229 @@
 import {
-  users,
-  profiles,
-  tips,
-  analytics,
-  qrScans,
-  events,
-  impressions,
   type User,
-  type UpsertUser,
   type Profile,
-  type InsertProfile,
   type Tip,
-  type InsertTip,
-  type Analytics,
-  type InsertAnalytics,
   type QrScan,
-  type InsertQrScan,
-  type Event,
-  type InsertEvent,
-  type Impression,
-  type InsertImpression,
+  type InsertUser,
+  type InsertProfile,
+  type InsertTip,
+  type InsertQrScan
 } from "@shared/schema";
-import { db } from "./db";
-import { eq, desc, and, gte, lt, sql, count, sum, avg } from "drizzle-orm";
-import { createHash } from "crypto";
 
-// Interface for storage operations
+// In-memory storage interface (fallback when database is unavailable)
 export interface IStorage {
-  // User operations (secure auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(userData: { 
-    email: string; 
-    passwordHash: string; 
-    firstName: string; 
-    lastName: string; 
-  }): Promise<User>;
-  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User>;
   
   // Profile operations
-  getProfile(id: string): Promise<(Profile & { user: User }) | undefined>;
-  getProfileByHandle(handle: string): Promise<(Profile & { user: User }) | undefined>;
+  getProfile(userId: string): Promise<Profile | undefined>;
+  getProfileByHandle(handle: string): Promise<Profile | undefined>;
   createProfile(profile: InsertProfile): Promise<Profile>;
-  updateProfile(id: string, updates: Partial<InsertProfile>): Promise<Profile | undefined>;
-  deleteProfile(id: string): Promise<boolean>;
-  getUserProfiles(userId: string): Promise<Profile[]>;
-
+  updateProfile(userId: string, updates: Partial<Profile>): Promise<Profile>;
+  
   // Tip operations
   createTip(tip: InsertTip): Promise<Tip>;
-  getTip(id: string): Promise<Tip | undefined>;
-  updateTipStatus(id: string, status: string, processedAt?: Date): Promise<Tip | undefined>;
-  getProfileTips(profileId: string, limit?: number): Promise<Tip[]>;
-
-  // Analytics operations
-  getProfileAnalytics(profileId: string, startDate: Date, endDate: Date): Promise<Analytics[]>;
-  updateDailyAnalytics(profileId: string, date: Date): Promise<void>;
-
-  // Event tracking
-  trackEvent(event: InsertEvent): Promise<Event>;
-  getProfileEvents(profileId: string, eventType?: string, limit?: number): Promise<Event[]>;
-
-  // QR scan tracking
-  trackQrScan(scan: InsertQrScan): Promise<QrScan>;
-  updateQrScanConversion(scanId: string, tipId: string): Promise<QrScan | undefined>;
-
-  // Ad impressions
-  trackImpression(impression: InsertImpression): Promise<Impression>;
-  updateImpressionClick(impressionId: string): Promise<Impression | undefined>;
+  getTipsByProfile(profileId: string): Promise<Tip[]>;
+  getTipStats(profileId: string): Promise<{
+    totalEarnings: number;
+    totalTips: number;
+    averageTip: number;
+    thisWeekEarnings: number;
+  }>;
   
-  // Additional analytics methods
-  getTipsByProfile(profileId: string, days?: number): Promise<Tip[]>;
-  getQrScanCount(profileId: string, days?: number): Promise<number>;
-  
-  // Subscription management
-  getUserSubscription(userId: string): Promise<{ plan: string; status: string; currentPeriodEnd?: string } | null>;
-  
-  // Profile security
-  getUserProfiles(userId: string): Promise<Profile[]>;
-  updateUserProfile(userId: string, profileId: string, updates: Partial<InsertProfile>): Promise<Profile | null>;
-  
-  // User operations for auth
-  upsertUser(user: UpsertUser): Promise<User>;
+  // QR scan operations
+  createQrScan(scan: InsertQrScan): Promise<QrScan>;
+  getQrScansByProfile(profileId: string): Promise<QrScan[]>;
+  getQrScanStats(profileId: string): Promise<{
+    totalScans: number;
+    uniqueVisitors: number;
+    conversionRate: number;
+  }>;
 }
 
-function hashIp(ip: string): string {
-  return createHash('sha256').update(ip + process.env.IP_SALT || 'tipvault-salt').digest('hex');
-}
+// Memory storage implementation (for development/demo)
+export class MemoryStorage implements IStorage {
+  private users = new Map<string, User>();
+  private profiles = new Map<string, Profile>();
+  private tips = new Map<string, Tip>();
+  private qrScans = new Map<string, QrScan>();
 
-export class DatabaseStorage implements IStorage {
-  // User operations (for Replit Auth)
+  private generateId() {
+    return Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+  }
+
+  // User operations
   async getUser(id: string): Promise<User | undefined> {
-    try {
-      const result = await db.select().from(users).where(eq(users.id, id));
-      return result[0] || undefined;
-    } catch (error) {
-      console.error('Error getting user:', error);
-      return undefined;
-    }
+    return this.users.get(id);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    try {
-      const result = await db.select().from(users).where(eq(users.email, email));
-      return result[0] || undefined;
-    } catch (error) {
-      console.error('Error getting user by email:', error);
-      return undefined;
+    for (const user of this.users.values()) {
+      if (user.email === email) {
+        return user;
+      }
     }
+    return undefined;
   }
 
-  async createUser(userData: { 
-    email: string; 
-    passwordHash: string; 
-    firstName: string; 
-    lastName: string; 
-  }): Promise<User> {
-    try {
-      const result = await db
-        .insert(users)
-        .values({
-          email: userData.email,
-          passwordHash: userData.passwordHash,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          plan: 'free',
-          isEmailVerified: false,
-        })
-        .returning();
-      return result[0];
-    } catch (error) {
-      console.error('Error creating user:', error);
-      throw error;
-    }
-  }
-
-  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
-    const [user] = await db
-      .update(users)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(users.id, id))
-      .returning();
+  async createUser(userData: InsertUser): Promise<User> {
+    const user: User = {
+      id: this.generateId(),
+      email: userData.email,
+      passwordHash: userData.passwordHash,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.users.set(user.id, user);
     return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User> {
+    const user = this.users.get(id);
+    if (!user) throw new Error('User not found');
+    
+    const updatedUser = { ...user, ...updates, updatedAt: new Date() };
+    this.users.set(id, updatedUser);
+    return updatedUser;
   }
 
   // Profile operations
-  async getProfile(id: string): Promise<(Profile & { user: User }) | undefined> {
-    const result = await db
-      .select()
-      .from(profiles)
-      .innerJoin(users, eq(profiles.userId, users.id))
-      .where(eq(profiles.id, id))
-      .limit(1);
-    
-    if (!result[0]) return undefined;
-    
-    return {
-      ...result[0].profiles,
-      user: result[0].users,
+  async getProfile(userId: string): Promise<Profile | undefined> {
+    for (const profile of this.profiles.values()) {
+      if (profile.userId === userId) {
+        return profile;
+      }
+    }
+    return undefined;
+  }
+
+  async getProfileByHandle(handle: string): Promise<Profile | undefined> {
+    for (const profile of this.profiles.values()) {
+      if (profile.handle === handle) {
+        return profile;
+      }
+    }
+    return undefined;
+  }
+
+  async createProfile(profileData: InsertProfile): Promise<Profile> {
+    const profile: Profile = {
+      id: this.generateId(),
+      userId: profileData.userId,
+      handle: profileData.handle,
+      firstName: profileData.firstName,
+      lastName: profileData.lastName,
+      bio: profileData.bio || null,
+      workplace: profileData.workplace || null,
+      jobTitle: profileData.jobTitle || null,
+      venmoHandle: profileData.venmoHandle || null,
+      cashappHandle: profileData.cashappHandle || null,
+      zelleEmail: profileData.zelleEmail || null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
+    this.profiles.set(profile.id, profile);
+    return profile;
   }
 
-  async getProfileByHandle(handle: string): Promise<(Profile & { user: User }) | undefined> {
-    const result = await db
-      .select()
-      .from(profiles)
-      .innerJoin(users, eq(profiles.userId, users.id))
-      .where(eq(profiles.handle, handle))
-      .limit(1);
+  async updateProfile(userId: string, updates: Partial<Profile>): Promise<Profile> {
+    const profile = await this.getProfile(userId);
+    if (!profile) throw new Error('Profile not found');
     
-    if (!result[0]) return undefined;
-    
-    return {
-      ...result[0].profiles,
-      user: result[0].users,
-    };
-  }
-
-  async createProfile(profile: InsertProfile): Promise<Profile> {
-    const [createdProfile] = await db
-      .insert(profiles)
-      .values(profile)
-      .returning();
-    return createdProfile;
-  }
-
-  async updateProfile(id: string, updates: Partial<InsertProfile>): Promise<Profile | undefined> {
-    const [updatedProfile] = await db
-      .update(profiles)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(profiles.id, id))
-      .returning();
+    const updatedProfile = { ...profile, ...updates, updatedAt: new Date() };
+    this.profiles.set(profile.id, updatedProfile);
     return updatedProfile;
   }
 
-  async deleteProfile(id: string): Promise<boolean> {
-    const result = await db
-      .delete(profiles)
-      .where(eq(profiles.id, id));
-    return result.rowCount! > 0;
-  }
-
-  async getUserProfiles(userId: string): Promise<Profile[]> {
-    return db
-      .select()
-      .from(profiles)
-      .where(eq(profiles.userId, userId))
-      .orderBy(desc(profiles.createdAt));
-  }
-
   // Tip operations
-  async createTip(tip: InsertTip): Promise<Tip> {
-    const tipData = {
-      ...tip,
-      ipHash: tip.ipHash || hashIp('0.0.0.0'), // Default if not provided
-      amount: tip.amount.toString(), // Ensure amount is string for decimal field
+  async createTip(tipData: InsertTip): Promise<Tip> {
+    const tip: Tip = {
+      id: this.generateId(),
+      profileId: tipData.profileId,
+      amount: tipData.amount,
+      message: tipData.message || null,
+      paymentMethod: tipData.paymentMethod,
+      paymentIntentId: tipData.paymentIntentId || null,
+      status: tipData.status,
+      customerName: tipData.customerName || null,
+      customerEmail: tipData.customerEmail || null,
+      createdAt: new Date(),
     };
-
-    const [createdTip] = await db
-      .insert(tips)
-      .values(tipData)
-      .returning();
-    return createdTip;
-  }
-
-  async getTip(id: string): Promise<Tip | undefined> {
-    const [tip] = await db
-      .select()
-      .from(tips)
-      .where(eq(tips.id, id))
-      .limit(1);
+    this.tips.set(tip.id, tip);
     return tip;
   }
 
-  async updateTipStatus(id: string, status: string, processedAt?: Date): Promise<Tip | undefined> {
-    const updateData: any = { status };
-    if (processedAt) {
-      updateData.processedAt = processedAt;
-    }
-
-    const [updatedTip] = await db
-      .update(tips)
-      .set(updateData)
-      .where(eq(tips.id, id))
-      .returning();
-    return updatedTip;
+  async getTipsByProfile(profileId: string): Promise<Tip[]> {
+    const tips = Array.from(this.tips.values()).filter(tip => tip.profileId === profileId);
+    return tips.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   }
 
-  async getProfileTips(profileId: string, limit = 50): Promise<Tip[]> {
-    return db
-      .select()
-      .from(tips)
-      .where(eq(tips.profileId, profileId))
-      .orderBy(desc(tips.createdAt))
-      .limit(limit);
-  }
+  async getTipStats(profileId: string): Promise<{
+    totalEarnings: number;
+    totalTips: number;
+    averageTip: number;
+    thisWeekEarnings: number;
+  }> {
+    const tips = await this.getTipsByProfile(profileId);
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-  // Analytics operations
-  async getProfileAnalytics(profileId: string, startDate: Date, endDate: Date): Promise<Analytics[]> {
-    return db
-      .select()
-      .from(analytics)
-      .where(
-        and(
-          eq(analytics.profileId, profileId),
-          gte(analytics.date, startDate),
-          lt(analytics.date, endDate)
-        )
-      )
-      .orderBy(analytics.date);
-  }
-
-  async updateDailyAnalytics(profileId: string, date: Date): Promise<void> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
+    const totalEarnings = tips.reduce((sum, tip) => sum + tip.amount, 0);
+    const totalTips = tips.length;
+    const averageTip = totalTips > 0 ? totalEarnings / totalTips : 0;
     
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
+    const thisWeekTips = tips.filter(tip => tip.createdAt >= oneWeekAgo);
+    const thisWeekEarnings = thisWeekTips.reduce((sum, tip) => sum + tip.amount, 0);
 
-    // Get daily stats
-    const [dailyStats] = await db
-      .select({
-        totalTips: count(tips.id),
-        totalAmount: sum(tips.amount),
-        avgTipAmount: avg(tips.amount),
-      })
-      .from(tips)
-      .where(
-        and(
-          eq(tips.profileId, profileId),
-          gte(tips.createdAt, startOfDay),
-          lt(tips.createdAt, endOfDay),
-          eq(tips.status, 'completed')
-        )
-      );
-
-    // Get QR scan count
-    const [scanStats] = await db
-      .select({
-        qrScans: count(qrScans.id),
-      })
-      .from(qrScans)
-      .where(
-        and(
-          eq(qrScans.profileId, profileId),
-          gte(qrScans.createdAt, startOfDay),
-          lt(qrScans.createdAt, endOfDay)
-        )
-      );
-
-    // Calculate conversion rate
-    const conversionRate = scanStats.qrScans > 0 
-      ? (Number(dailyStats.totalTips) / scanStats.qrScans) * 100 
-      : 0;
-
-    // Upsert daily analytics
-    await db
-      .insert(analytics)
-      .values({
-        profileId,
-        date: startOfDay,
-        totalTips: Number(dailyStats.totalTips) || 0,
-        totalAmount: dailyStats.totalAmount?.toString() || '0',
-        avgTipAmount: dailyStats.avgTipAmount?.toString() || '0',
-        qrScans: scanStats.qrScans || 0,
-        conversionRate: conversionRate.toFixed(2),
-      })
-      .onConflictDoUpdate({
-        target: [analytics.profileId, analytics.date],
-        set: {
-          totalTips: Number(dailyStats.totalTips) || 0,
-          totalAmount: dailyStats.totalAmount?.toString() || '0',
-          avgTipAmount: dailyStats.avgTipAmount?.toString() || '0',
-          qrScans: scanStats.qrScans || 0,
-          conversionRate: conversionRate.toFixed(2),
-        },
-      });
-  }
-
-  // Event tracking
-  async trackEvent(event: InsertEvent): Promise<Event> {
-    const eventData = {
-      ...event,
-      ipHash: event.ipHash || hashIp('0.0.0.0'),
-    };
-
-    const [createdEvent] = await db
-      .insert(events)
-      .values(eventData)
-      .returning();
-    return createdEvent;
-  }
-
-  async getProfileEvents(profileId: string, eventType?: string, limit = 100): Promise<Event[]> {
-    const conditions = [eq(events.profileId!, profileId)];
-    if (eventType) {
-      conditions.push(eq(events.eventType, eventType));
-    }
-
-    return db
-      .select()
-      .from(events)
-      .where(and(...conditions))
-      .orderBy(desc(events.createdAt))
-      .limit(limit);
-  }
-
-  // QR scan tracking
-  async trackQrScan(scan: InsertQrScan): Promise<QrScan> {
-    const scanData = {
-      ...scan,
-      ipHash: scan.ipHash || hashIp('0.0.0.0'),
-    };
-
-    const [createdScan] = await db
-      .insert(qrScans)
-      .values(scanData)
-      .returning();
-    return createdScan;
-  }
-
-  async updateQrScanConversion(scanId: string, tipId: string): Promise<QrScan | undefined> {
-    const [updatedScan] = await db
-      .update(qrScans)
-      .set({
-        convertedToTip: true,
-        tipId,
-      })
-      .where(eq(qrScans.id, scanId))
-      .returning();
-    return updatedScan;
-  }
-
-  // Ad impressions
-  async trackImpression(impression: InsertImpression): Promise<Impression> {
-    const impressionData = {
-      ...impression,
-      ipHash: impression.ipHash || hashIp('0.0.0.0'),
-    };
-
-    const [createdImpression] = await db
-      .insert(impressions)
-      .values(impressionData)
-      .returning();
-    return createdImpression;
-  }
-
-  async updateImpressionClick(impressionId: string): Promise<Impression | undefined> {
-    const [updatedImpression] = await db
-      .update(impressions)
-      .set({ clicked: true })
-      .where(eq(impressions.id, impressionId))
-      .returning();
-    return updatedImpression;
-  }
-
-  // Additional analytics methods implementation
-  async getTipsByProfile(profileId: string, days: number = 30): Promise<Tip[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    
-    return db
-      .select()
-      .from(tips)
-      .where(
-        and(
-          eq(tips.profileId, profileId),
-          gte(tips.createdAt, startDate),
-          eq(tips.status, 'completed')
-        )
-      )
-      .orderBy(desc(tips.createdAt));
-  }
-
-  async getQrScanCount(profileId: string, days: number = 30): Promise<number> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    
-    const [result] = await db
-      .select({
-        count: count(qrScans.id)
-      })
-      .from(qrScans)
-      .where(
-        and(
-          eq(qrScans.profileId, profileId),
-          gte(qrScans.createdAt, startDate)
-        )
-      );
-    
-    return Number(result.count) || 0;
-  }
-
-  // Subscription management
-  async getUserSubscription(userId: string): Promise<{ plan: string; status: string; currentPeriodEnd?: string } | null> {
-    const [user] = await db.select().from(users).where(eq(users.id, userId));
-    if (!user) return null;
-    
     return {
-      plan: user.plan || 'free',
-      status: user.subscriptionStatus || 'active',
-      currentPeriodEnd: user.subscriptionExpiresAt?.toISOString()
+      totalEarnings,
+      totalTips,
+      averageTip,
+      thisWeekEarnings,
     };
   }
 
-  // Profile security - ensure users can only access their own profiles
-  async updateUserProfile(userId: string, profileId: string, updates: Partial<InsertProfile>): Promise<Profile | null> {
-    // First verify the profile belongs to the user
-    const [existingProfile] = await db
-      .select()
-      .from(profiles)
-      .where(and(eq(profiles.id, profileId), eq(profiles.userId, userId)));
-    
-    if (!existingProfile) {
-      throw new Error('Profile not found or access denied');
-    }
-
-    const [updatedProfile] = await db
-      .update(profiles)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(profiles.id, profileId))
-      .returning();
-    
-    return updatedProfile || null;
+  // QR scan operations
+  async createQrScan(scanData: InsertQrScan): Promise<QrScan> {
+    const scan: QrScan = {
+      id: this.generateId(),
+      profileId: scanData.profileId,
+      ipHash: scanData.ipHash,
+      userAgent: scanData.userAgent || null,
+      scannedAt: new Date(),
+    };
+    this.qrScans.set(scan.id, scan);
+    return scan;
   }
 
-  // User operations for auth
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
+  async getQrScansByProfile(profileId: string): Promise<QrScan[]> {
+    const scans = Array.from(this.qrScans.values()).filter(scan => scan.profileId === profileId);
+    return scans.sort((a, b) => b.scannedAt.getTime() - a.scannedAt.getTime());
+  }
+
+  async getQrScanStats(profileId: string): Promise<{
+    totalScans: number;
+    uniqueVisitors: number;
+    conversionRate: number;
+  }> {
+    const scans = await this.getQrScansByProfile(profileId);
+    const tips = await this.getTipsByProfile(profileId);
+    
+    const totalScans = scans.length;
+    const uniqueIps = new Set(scans.map(scan => scan.ipHash));
+    const uniqueVisitors = uniqueIps.size;
+    const conversionRate = totalScans > 0 ? (tips.length / totalScans) * 100 : 0;
+
+    return {
+      totalScans,
+      uniqueVisitors,
+      conversionRate,
+    };
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemoryStorage();

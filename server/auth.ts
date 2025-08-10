@@ -1,24 +1,20 @@
 import bcrypt from 'bcrypt';
 import session from 'express-session';
-import connectPg from 'connect-pg-simple';
+import MemoryStore from 'memorystore';
 import jwt from 'jsonwebtoken';
 import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
 
-// Session configuration
+// Session configuration with fallback to memory store
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: true,
-    ttl: sessionTtl / 1000, // Convert to seconds
-    tableName: "sessions",
-  });
+  const memoryStore = MemoryStore(session);
   
   return session({
     secret: process.env.SESSION_SECRET || 'tipvault-dev-secret',
-    store: sessionStore,
+    store: new memoryStore({
+      checkPeriod: sessionTtl,
+    }),
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -90,7 +86,7 @@ export const isAuthenticated: RequestHandler = (req, res, next) => {
     const token = authHeader.substring(7);
     const decoded = verifyToken(token);
     if (decoded) {
-      req.userId = decoded.userId;
+      (req as any).userId = decoded.userId;
       return next();
     }
   }
