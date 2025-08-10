@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Loader2, DollarSign } from 'lucide-react';
 
 const signupSchema = z.object({
@@ -43,9 +43,14 @@ export default function Signup() {
     onSuccess: () => {
       toast({
         title: 'Account created!',
-        description: 'Welcome to TipVault. Let\'s create your first tip profile.',
+        description: 'Welcome to TipVault. Redirecting to your dashboard...',
       });
-      setLocation('/');
+      // Invalidate auth query to refresh user state
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      // Small delay to let the query refresh, then redirect
+      setTimeout(() => {
+        setLocation('/');
+      }, 500);
     },
     onError: (error: any) => {
       toast({

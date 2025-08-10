@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { Loader2, DollarSign } from 'lucide-react';
 
 const loginSchema = z.object({
@@ -39,9 +39,14 @@ export default function Login() {
     onSuccess: () => {
       toast({
         title: 'Welcome back!',
-        description: 'You have been logged in successfully.',
+        description: 'Redirecting to your dashboard...',
       });
-      setLocation('/');
+      // Invalidate auth query to refresh user state
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      // Small delay to let the query refresh, then redirect
+      setTimeout(() => {
+        setLocation('/');
+      }, 500);
     },
     onError: (error: any) => {
       toast({

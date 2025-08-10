@@ -17,6 +17,7 @@ import Success from "@/pages/success";
 import StyleGuide from "@/pages/styleguide";
 import Checkout from "@/pages/checkout";
 import Dashboard from "@/pages/dashboard";
+import WelcomeDashboard from "@/pages/welcome-dashboard";
 import Analytics from "@/pages/analytics";
 import QRGenerator from "@/pages/qr-generator";
 import ProfileSettings from "@/pages/profile-settings";
@@ -39,7 +40,7 @@ function Router() {
   return (
     <Switch>
       {/* Public routes - available to everyone */}
-      <Route path="/" component={isAuthenticated ? Dashboard : Landing} />
+      <Route path="/" component={isAuthenticated ? WelcomeDashboard : Landing} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
       <Route path="/pricing" component={Pricing} />
