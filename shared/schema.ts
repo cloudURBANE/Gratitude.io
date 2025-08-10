@@ -35,6 +35,18 @@ export const users = pgTable("users", {
   firstName: varchar("first_name", { length: 100 }).notNull(),
   lastName: varchar("last_name", { length: 100 }).notNull(),
   profileImageUrl: varchar("profile_image_url", { length: 255 }),
+  
+  // Profile fields for tip page
+  handle: varchar("handle", { length: 50 }).unique(),
+  bio: text("bio"),
+  workplace: varchar("workplace", { length: 100 }),
+  jobTitle: varchar("job_title", { length: 100 }),
+  venmoHandle: varchar("venmo_handle", { length: 50 }),
+  cashappHandle: varchar("cashapp_handle", { length: 50 }),
+  zelleEmail: varchar("zelle_email", { length: 100 }),
+  profileCompleted: boolean("profile_completed").default(false),
+  
+  // Billing
   plan: varchar("plan", { length: 20 }).notNull().default("free"), // 'free' | 'pro'
   stripeCustomerId: varchar("stripe_customer_id", { length: 100 }),
   stripeSubscriptionId: varchar("stripe_subscription_id", { length: 100 }),

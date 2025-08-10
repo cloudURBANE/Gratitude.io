@@ -274,12 +274,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Profile creation endpoint - no auth barriers
-  app.post('/api/profiles', async (req, res) => {
+  // Profile creation endpoint - requires authentication  
+  app.post('/api/profiles', getCurrentUser, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
     try {
-      const profileData = req.body;
-      const profile = await storage.createProfile(profileData);
-      res.json(profile);
+      console.log('Creating profile for user:', req.user.id);
+      console.log('Profile data:', req.body);
+      
+      const { firstName, lastName, handle, bio, workplace, jobTitle, venmoHandle, cashappHandle, zelleEmail } = req.body;
+      
+      // Update the user with profile information
+      const updatedUser = await storage.updateUser(req.user.id, {
+        firstName: firstName || req.user.firstName,
+        lastName: lastName || req.user.lastName,
+        handle,
+        bio,
+        workplace,
+        jobTitle,
+        venmoHandle,
+        cashappHandle,
+        zelleEmail,
+        profileCompleted: true,
+        updatedAt: new Date()
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      console.log('Profile created successfully for user:', updatedUser.id);
+      const { passwordHash: _, ...userResponse } = updatedUser;
+      res.json(userResponse);
     } catch (error) {
       console.error("Error creating profile:", error);
       res.status(500).json({ message: "Failed to create profile" });
