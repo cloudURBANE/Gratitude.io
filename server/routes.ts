@@ -55,6 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post('/api/auth/signup', async (req, res) => {
     try {
+      console.log('Signup request body:', req.body);
       const { email, password, firstName, lastName } = signupSchema.parse(req.body);
       
       // Check if user already exists
@@ -65,12 +66,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Hash password and create user
       const passwordHash = await hashPassword(password);
+      console.log('Creating user with:', { email, firstName, lastName, passwordHashLength: passwordHash.length });
+      
       const user = await storage.createUser({
         email,
         passwordHash,
         firstName,
         lastName,
       });
+      
+      console.log('User created successfully:', user.id);
       
       // Set session
       req.session.userId = user.id;
@@ -80,25 +85,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json({ user: userResponse });
     } catch (error) {
       console.error('Signup error:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message, error.stack);
+      }
       res.status(400).json({ error: 'Invalid registration data' });
     }
   });
 
   app.post('/api/auth/login', async (req, res) => {
     try {
+      console.log('Login request:', req.body);
       const { email, password } = loginSchema.parse(req.body);
       
       // Find user
       const user = await storage.getUserByEmail(email);
       if (!user) {
+        console.log('User not found:', email);
         return res.status(401).json({ error: 'Invalid credentials' });
       }
+      
+      console.log('User found, verifying password...');
       
       // Verify password
       const isValid = await verifyPassword(password, user.passwordHash);
       if (!isValid) {
+        console.log('Password verification failed');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
+      
+      console.log('Login successful for user:', user.id);
       
       // Set session
       req.session.userId = user.id;
@@ -108,6 +123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ user: userResponse });
     } catch (error) {
       console.error('Login error:', error);
+      if (error instanceof Error) {
+        console.error('Error details:', error.message, error.stack);
+      }
       res.status(400).json({ error: 'Invalid login data' });
     }
   });
@@ -252,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const profileData = insertProfileSchema.parse({
         ...req.body,
-        userId: req.session.userId // Ensure profile belongs to authenticated user
+        userId: req.session!.userId! // Ensure profile belongs to authenticated user
       });
       const profile = await storage.createProfile(profileData);
       res.status(201).json(profile);
@@ -270,7 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Verify profile ownership by getting the profile first
       const profile = await storage.getProfile(profileId);
-      if (!profile || profile.userId !== req.session.userId) {
+      if (!profile || profile.userId !== req.session!.userId) {
         return res.status(404).json({ error: 'Profile not found or access denied' });
       }
       
@@ -285,7 +303,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get authenticated user's profiles
   app.get('/api/user/profiles', isAuthenticated, async (req, res) => {
     try {
-      const profiles = await storage.getUserProfiles(req.session.userId);
+      const profiles = await storage.getUserProfiles(req.session!.userId!);
       res.json(profiles);
     } catch (error) {
       console.error('Error fetching user profiles:', error);

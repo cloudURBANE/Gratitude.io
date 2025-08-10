@@ -45,7 +45,7 @@ export default function Signup() {
         title: 'Account created!',
         description: 'Welcome to TipVault. Let\'s create your first tip profile.',
       });
-      setLocation('/profile-setup');
+      setLocation('/');
     },
     onError: (error: any) => {
       toast({

@@ -198,6 +198,7 @@ export class DatabaseStorage implements IStorage {
     const tipData = {
       ...tip,
       ipHash: tip.ipHash || hashIp('0.0.0.0'), // Default if not provided
+      amount: tip.amount.toString(), // Ensure amount is string for decimal field
     };
 
     const [createdTip] = await db
