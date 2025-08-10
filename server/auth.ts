@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import session from 'express-session';
 import connectPg from 'connect-pg-simple';
+import jwt from 'jsonwebtoken';
 import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
 
@@ -60,25 +61,69 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash);
 }
 
-// Authentication middleware
+// JWT token management
+const JWT_SECRET = process.env.JWT_SECRET || 'tipvault-jwt-secret';
+
+export function generateToken(userId: string): string {
+  return jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
+}
+
+export function verifyToken(token: string): { userId: string } | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Authentication middleware with token fallback
 export const isAuthenticated: RequestHandler = (req, res, next) => {
+  // First try session-based auth
   if (req.session && req.session.userId) {
     return next();
   }
+  
+  // Fall back to token-based auth
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const decoded = verifyToken(token);
+    if (decoded) {
+      req.userId = decoded.userId;
+      return next();
+    }
+  }
+  
   res.status(401).json({ error: 'Authentication required' });
 };
 
-// Get current user from session
+// Get current user with token support
 export const getCurrentUser: RequestHandler = async (req, res, next) => {
-  console.log('getCurrentUser middleware - session ID:', req.sessionID);
-  console.log('getCurrentUser middleware - session userId:', req.session?.userId);
-  console.log('getCurrentUser middleware - session data:', JSON.stringify(req.session, null, 2));
+  let userId: string | undefined;
   
+  // Try session first
   if (req.session && req.session.userId) {
+    userId = req.session.userId;
+    console.log('User ID from session:', userId);
+  } else {
+    // Try token
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const decoded = verifyToken(token);
+      if (decoded) {
+        userId = decoded.userId;
+        console.log('User ID from token:', userId);
+      }
+    }
+  }
+  
+  if (userId) {
     try {
-      const user = await storage.getUser(req.session.userId);
+      const user = await storage.getUser(userId);
       req.user = user;
-      console.log('User loaded from session:', user?.email);
+      console.log('User loaded:', user?.email);
     } catch (error) {
       console.error('Error fetching user:', error);
     }

@@ -40,11 +40,17 @@ export default function Signup() {
       const response = await apiRequest('POST', '/api/auth/signup', data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Store the authentication token
+      if (data.token) {
+        localStorage.setItem('auth-token', data.token);
+      }
+      
       toast({
         title: 'Account created!',
         description: 'Welcome to TipVault. Redirecting to your dashboard...',
       });
+      
       // Force refetch and wait for completion before redirect
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] }).then(() => {
         setTimeout(() => setLocation('/'), 500);

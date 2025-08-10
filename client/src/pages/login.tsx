@@ -36,11 +36,17 @@ export default function Login() {
       const response = await apiRequest('POST', '/api/auth/login', data);
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Store the authentication token
+      if (data.token) {
+        localStorage.setItem('auth-token', data.token);
+      }
+      
       toast({
         title: 'Welcome back!',
         description: 'Redirecting to your dashboard...',
       });
+      
       // Force refetch and wait for completion before redirect
       queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] }).then(() => {
         setTimeout(() => setLocation('/'), 500);

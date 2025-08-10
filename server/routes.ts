@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, getCurrentUser, hashPassword, verifyPassword } from "./auth";
+import { setupAuth, isAuthenticated, getCurrentUser, hashPassword, verifyPassword, generateToken } from "./auth";
 import { insertProfileSchema, insertTipSchema } from "@shared/schema";
 import Stripe from "stripe";
 import { createHash } from "crypto";
@@ -89,11 +89,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         console.log('Signup - Session saved successfully');
-        console.log('Signup - Session data after save:', JSON.stringify(req.session, null, 2));
         
-        // Return user without password
+        // Generate JWT token for reliable authentication
+        const token = generateToken(user.id);
+        
+        // Return user without password plus token
         const { passwordHash: _, ...userResponse } = user;
-        res.status(201).json({ user: userResponse });
+        res.status(201).json({ 
+          user: userResponse,
+          token: token
+        });
       });
     } catch (error) {
       console.error('Signup error:', error);
@@ -139,11 +144,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         console.log('Login - Session saved successfully');
-        console.log('Login - Session data after save:', JSON.stringify(req.session, null, 2));
         
-        // Return user without password
+        // Generate JWT token for reliable authentication
+        const token = generateToken(user.id);
+        
+        // Return user without password plus token
         const { passwordHash: _, ...userResponse } = user;
-        res.json({ user: userResponse });
+        res.json({ 
+          user: userResponse,
+          token: token
+        });
       });
     } catch (error) {
       console.error('Login error:', error);
