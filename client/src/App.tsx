@@ -24,6 +24,7 @@ import ProfileSettings from "@/pages/profile-settings";
 import AccountSettings from "@/pages/account-settings";
 import Pricing from "@/pages/pricing";
 import BusinessDashboard from "@/pages/business-dashboard";
+import AnalyticsDashboard from "@/pages/analytics-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -75,7 +76,7 @@ function Router() {
         <>
           <Route path="/profile-setup" component={ProfileSetup} />
           <Route path="/dashboard" component={Dashboard} />
-          <Route path="/analytics" component={Analytics} />
+          <Route path="/analytics" component={AnalyticsDashboard} />
           <Route path="/qr" component={QRGenerator} />
           <Route path="/settings" component={ProfileSettings} />
           <Route path="/account-settings" component={AccountSettings} />
