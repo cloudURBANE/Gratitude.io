@@ -47,12 +47,12 @@ export const users = pgTable("users", {
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 100 }).notNull(),
-  role: varchar("role", { length: 100 }).notNull(),
-  location: varchar("location", { length: 100 }),
+  displayName: varchar("display_name", { length: 100 }).notNull(),
   handle: varchar("handle", { length: 50 }).notNull().unique(),
+  jobTitle: varchar("job_title", { length: 100 }),
+  businessName: varchar("business_name", { length: 100 }),
+  description: text("description"),
   avatarUrl: text("avatar_url"),
-  bio: text("bio"),
   // Payment methods
   venmoHandle: varchar("venmo_handle", { length: 50 }),
   cashappHandle: varchar("cashapp_handle", { length: 50 }),

@@ -3,11 +3,15 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { AuthProvider } from "@/components/AuthProvider";
+import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 
 import Home from "@/pages/home";
+import Landing from "@/pages/landing";
 import Login from "@/pages/login";
 import TipFlow from "@/pages/tip-flow";  
+import TipPage from "@/pages/tip-page";
 import Success from "@/pages/success";
 import StyleGuide from "@/pages/styleguide";
 import Checkout from "@/pages/checkout";
@@ -20,21 +24,37 @@ import BusinessDashboard from "@/pages/business-dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/login" component={Login} />
-      <Route path="/pricing" component={Pricing} />
-      <Route path="/business" component={BusinessDashboard} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/u/:handle" component={TipFlow} />
-      <Route path="/checkout" component={Checkout} />
-      <Route path="/u/:handle/analytics" component={Analytics} />
-      <Route path="/u/:handle/qr" component={QRGenerator} />
-      <Route path="/u/:handle/settings" component={ProfileSettings} />
-      <Route path="/success" component={Success} />
-      <Route path="/styleguide" component={StyleGuide} />
-      <Route component={NotFound} />
+      {isLoading || !isAuthenticated ? (
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/u/:handle" component={TipPage} />
+          <Route path="/pricing" component={Pricing} />
+          <Route path="/styleguide" component={StyleGuide} />
+          <Route path="/tip" component={TipFlow} />
+          <Route path="/login" component={Login} />
+          <Route component={NotFound} />
+        </>
+      ) : (
+        <>
+          <Route path="/" component={Dashboard} />
+          <Route path="/u/:handle" component={TipPage} />
+          <Route path="/analytics" component={Analytics} />
+          <Route path="/dashboard" component={Dashboard} />
+          <Route path="/qr" component={QRGenerator} />
+          <Route path="/settings" component={ProfileSettings} />
+          <Route path="/business" component={BusinessDashboard} />
+          <Route path="/styleguide" component={StyleGuide} />
+          <Route path="/pricing" component={Pricing} />
+          <Route path="/checkout" component={Checkout} />
+          <Route path="/success" component={Success} />
+          <Route path="/tip" component={TipFlow} />
+          <Route component={NotFound} />
+        </>
+      )}
     </Switch>
   );
 }
@@ -48,10 +68,12 @@ function App() {
   return (
     <div className="dark">
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Router />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Router />
+          </TooltipProvider>
+        </AuthProvider>
       </QueryClientProvider>
     </div>
   );

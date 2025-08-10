@@ -67,6 +67,13 @@ export interface IStorage {
   
   // Subscription management
   getUserSubscription(userId: string): Promise<{ plan: string; status: string; currentPeriodEnd?: string } | null>;
+  
+  // Profile security
+  getUserProfiles(userId: string): Promise<Profile[]>;
+  updateUserProfile(userId: string, profileId: string, updates: Partial<InsertProfile>): Promise<Profile | null>;
+  
+  // User operations for auth
+  upsertUser(user: UpsertUser): Promise<User>;
 }
 
 function hashIp(ip: string): string {
@@ -395,7 +402,7 @@ export class DatabaseStorage implements IStorage {
       .where(
         and(
           eq(qrScans.profileId, profileId),
-          gte(qrScans.scannedAt, startDate)
+          gte(qrScans.createdAt, startDate)
         )
       );
     
@@ -404,11 +411,51 @@ export class DatabaseStorage implements IStorage {
 
   // Subscription management
   async getUserSubscription(userId: string): Promise<{ plan: string; status: string; currentPeriodEnd?: string } | null> {
-    // For now, return free tier - would be replaced with real subscription table
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) return null;
+    
     return {
-      plan: 'free',
-      status: 'active'
+      plan: user.plan || 'free',
+      status: user.subscriptionStatus || 'active',
+      currentPeriodEnd: user.subscriptionExpiresAt?.toISOString()
     };
+  }
+
+  // Profile security - ensure users can only access their own profiles
+  async updateUserProfile(userId: string, profileId: string, updates: Partial<InsertProfile>): Promise<Profile | null> {
+    // First verify the profile belongs to the user
+    const [existingProfile] = await db
+      .select()
+      .from(profiles)
+      .where(and(eq(profiles.id, profileId), eq(profiles.userId, userId)));
+    
+    if (!existingProfile) {
+      throw new Error('Profile not found or access denied');
+    }
+
+    const [updatedProfile] = await db
+      .update(profiles)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(profiles.id, profileId))
+      .returning();
+    
+    return updatedProfile || null;
+  }
+
+  // User operations for auth
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
   }
 }
 

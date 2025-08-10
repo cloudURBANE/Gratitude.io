@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProfileSchema, insertTipSchema } from "@shared/schema";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
 import { createHash } from "crypto";
 
@@ -26,16 +27,47 @@ function hashIp(ip: string): string {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication
+  await setupAuth(app);
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Auth user endpoint
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      res.json({
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl,
+        plan: user.plan
+      });
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
   // Server-side entitlements endpoint for clean feature gating
   app.get('/api/entitlements', async (req, res) => {
     try {
-      // Get user ID from session (when auth is implemented)
-      const userId = req.session?.userId || 'anonymous';
+      let userId = 'anonymous';
+      
+      // Get user ID from authenticated session
+      if (req.isAuthenticated && req.isAuthenticated()) {
+        userId = (req.user as any)?.claims?.sub;
+      }
       
       // Check user subscription in database
       const subscription = await storage.getUserSubscription(userId);
@@ -137,14 +169,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/profiles', async (req, res) => {
+  // Protected profile creation - user must be authenticated
+  app.post('/api/profiles', isAuthenticated, async (req: any, res) => {
     try {
-      const profileData = insertProfileSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const profileData = insertProfileSchema.parse({
+        ...req.body,
+        userId // Ensure profile is created for authenticated user
+      });
+      
       const profile = await storage.createProfile(profileData);
       res.status(201).json(profile);
     } catch (error) {
       console.error('Error creating profile:', error);
       res.status(400).json({ error: 'Invalid profile data' });
+    }
+  });
+
+  // Protected profile update - user can only update their own profiles
+  app.put('/api/profiles/:profileId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { profileId } = req.params;
+      const updates = insertProfileSchema.partial().parse(req.body);
+      
+      const updatedProfile = await storage.updateUserProfile(userId, profileId, updates);
+      
+      if (!updatedProfile) {
+        return res.status(404).json({ error: 'Profile not found or access denied' });
+      }
+      
+      res.json(updatedProfile);
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      res.status(400).json({ error: 'Invalid profile data or access denied' });
+    }
+  });
+
+  // Get user's profiles (authenticated)
+  app.get('/api/user/profiles', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profiles = await storage.getUserProfiles(userId);
+      res.json(profiles);
+    } catch (error) {
+      console.error('Error fetching user profiles:', error);
+      res.status(500).json({ error: 'Failed to fetch profiles' });
     }
   });
 
