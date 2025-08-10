@@ -182,6 +182,98 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update user profile
+  app.put('/api/auth/profile', getCurrentUser, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    try {
+      const { firstName, lastName, email, handle, jobTitle, workplace, bio, profileImageUrl } = req.body;
+      
+      const updatedUser = await storage.updateUser(req.user.id, {
+        firstName,
+        lastName,
+        email,
+        handle,
+        jobTitle,
+        workplace,
+        bio,
+        profileImageUrl,
+        updatedAt: new Date()
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const { passwordHash: _, ...userResponse } = updatedUser;
+      res.json(userResponse);
+    } catch (error) {
+      console.error('Profile update error:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
+    }
+  });
+
+  // Update user settings
+  app.put('/api/auth/settings', getCurrentUser, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    try {
+      const settings = req.body;
+      
+      // Store settings in user preferences or separate table
+      // For now, we'll just return success - you can extend this based on your schema
+      res.json({ success: true, settings });
+    } catch (error) {
+      console.error('Settings update error:', error);
+      res.status(500).json({ error: 'Failed to update settings' });
+    }
+  });
+
+  // Get user analytics/stats
+  app.get('/api/analytics/stats', getCurrentUser, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    try {
+      // Return mock analytics data for now - implement real analytics later
+      const stats = {
+        totalEarnings: '234.50',
+        thisMonth: '89.20',
+        totalTips: '47',
+        avgTip: '12.75'
+      };
+      
+      res.json(stats);
+    } catch (error) {
+      console.error('Analytics error:', error);
+      res.status(500).json({ error: 'Failed to get analytics' });
+    }
+  });
+
+  // Get current subscription
+  app.get('/api/subscription/current', getCurrentUser, async (req, res) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    try {
+      const subscription = {
+        plan: req.user.plan || 'free',
+        nextBilling: req.user.subscriptionExpiresAt || null
+      };
+      
+      res.json(subscription);
+    } catch (error) {
+      console.error('Subscription error:', error);
+      res.status(500).json({ error: 'Failed to get subscription' });
+    }
+  });
+
   // Profile creation endpoint - no auth barriers
   app.post('/api/profiles', async (req, res) => {
     try {

@@ -21,6 +21,7 @@ import WelcomeDashboard from "@/pages/welcome-dashboard";
 import Analytics from "@/pages/analytics";
 import QRGenerator from "@/pages/qr-generator";
 import ProfileSettings from "@/pages/profile-settings";
+import AccountSettings from "@/pages/account-settings";
 import Pricing from "@/pages/pricing";
 import BusinessDashboard from "@/pages/business-dashboard";
 import NotFound from "@/pages/not-found";
@@ -60,6 +61,7 @@ function Router() {
           <Route path="/analytics" component={Analytics} />
           <Route path="/qr" component={QRGenerator} />
           <Route path="/settings" component={ProfileSettings} />
+          <Route path="/account-settings" component={AccountSettings} />
           <Route path="/business" component={BusinessDashboard} />
         </>
       ) : (
