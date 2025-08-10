@@ -90,13 +90,23 @@ function hashIp(ip: string): string {
 export class DatabaseStorage implements IStorage {
   // User operations (for Replit Auth)
   async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id));
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return undefined;
+    }
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    try {
+      const result = await db.select().from(users).where(eq(users.email, email));
+      return result[0] || undefined;
+    } catch (error) {
+      console.error('Error getting user by email:', error);
+      return undefined;
+    }
   }
 
   async createUser(userData: { 
@@ -105,18 +115,23 @@ export class DatabaseStorage implements IStorage {
     firstName: string; 
     lastName: string; 
   }): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values({
-        email: userData.email,
-        passwordHash: userData.passwordHash,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        plan: 'free',
-        isEmailVerified: false,
-      })
-      .returning();
-    return user;
+    try {
+      const result = await db
+        .insert(users)
+        .values({
+          email: userData.email,
+          passwordHash: userData.passwordHash,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          plan: 'free',
+          isEmailVerified: false,
+        })
+        .returning();
+      return result[0];
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
+    }
   }
 
   async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
