@@ -37,13 +37,18 @@ export default function Signup() {
 
   const signupMutation = useMutation({
     mutationFn: async (data: SignupForm) => {
+      console.log('Submitting signup data:', data);
       const response = await apiRequest('POST', '/api/auth/signup', data);
-      return response.json();
+      const result = await response.json();
+      console.log('Signup response:', result);
+      return result;
     },
     onSuccess: (data) => {
+      console.log('Signup successful:', data);
       // Store the authentication token
       if (data.token) {
         localStorage.setItem('auth-token', data.token);
+        console.log('Token stored successfully');
       }
       
       toast({
@@ -57,6 +62,8 @@ export default function Signup() {
       });
     },
     onError: (error: any) => {
+      console.error('Signup error:', error);
+      console.error('Error message:', error.message);
       toast({
         title: 'Signup failed',
         description: error.message || 'Something went wrong',
@@ -66,6 +73,8 @@ export default function Signup() {
   });
 
   const onSubmit = (data: SignupForm) => {
+    console.log('Form submitted with data:', data);
+    console.log('Form errors:', form.formState.errors);
     signupMutation.mutate(data);
   };
 
