@@ -22,8 +22,9 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      secure: false, // Disable secure for development
       maxAge: sessionTtl,
+      sameSite: 'lax', // Add explicit sameSite setting
     },
   });
 }
@@ -36,7 +37,7 @@ export function setupAuth(app: Express) {
   // Enable CORS for session cookies
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Access-Control-Allow-Origin', req.headers.origin);
+    res.header('Access-Control-Allow-Origin', 'http://localhost:5000');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     if (req.method === 'OPTIONS') {
