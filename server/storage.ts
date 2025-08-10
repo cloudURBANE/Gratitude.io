@@ -3,7 +3,6 @@ import {
   type Profile,
   type Tip,
   type QrScan,
-  type InsertUser,
   type InsertProfile,
   type InsertTip,
   type InsertQrScan
@@ -14,7 +13,7 @@ export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: Partial<User>): Promise<User>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   
   // Profile operations
@@ -41,6 +40,16 @@ export interface IStorage {
     uniqueVisitors: number;
     conversionRate: number;
   }>;
+
+  // Additional methods needed for complete functionality
+  updateTipStatus(tipId: string, status: string, completedAt?: Date): Promise<void>;
+  getUserProfiles(userId: string): Promise<Profile[]>;
+  getTip(tipId: string): Promise<Tip | undefined>;
+  trackEvent(eventData: any): Promise<{ id: string }>;
+  trackQrScan(scanData: any): Promise<{ id: string }>;
+  getProfileTips(profileId: string, limit?: number): Promise<Tip[]>;
+  trackImpression(data: any): Promise<{ id: string }>;
+  getProfileAnalytics(profileId: string): Promise<any>;
 }
 
 // Memory storage implementation (for development/demo)
@@ -222,6 +231,68 @@ export class MemoryStorage implements IStorage {
       totalScans,
       uniqueVisitors,
       conversionRate,
+    };
+  }
+
+  // Additional methods implementation
+  async updateTipStatus(tipId: string, status: string, completedAt?: Date): Promise<void> {
+    const tip = this.tips.get(tipId);
+    if (tip) {
+      tip.status = status;
+      if (completedAt) {
+        tip.createdAt = completedAt;
+      }
+      this.tips.set(tipId, tip);
+    }
+  }
+
+  async getUserProfiles(userId: string): Promise<Profile[]> {
+    const profiles = Array.from(this.profiles.values()).filter(profile => profile.userId === userId);
+    return profiles;
+  }
+
+  async getTip(tipId: string): Promise<Tip | undefined> {
+    return this.tips.get(tipId);
+  }
+
+  async trackEvent(eventData: any): Promise<{ id: string }> {
+    const eventId = this.generateId();
+    // Store event data - simplified implementation
+    return { id: eventId };
+  }
+
+  async trackQrScan(scanData: any): Promise<{ id: string }> {
+    const scan: QrScan = {
+      id: this.generateId(),
+      profileId: scanData.profileId,
+      ipHash: scanData.ipHash,
+      userAgent: scanData.userAgent || null,
+      scannedAt: new Date(),
+    };
+    this.qrScans.set(scan.id, scan);
+    return { id: scan.id };
+  }
+
+  async getProfileTips(profileId: string, limit: number = 100): Promise<Tip[]> {
+    const tips = await this.getTipsByProfile(profileId);
+    return tips.slice(0, limit);
+  }
+
+  async trackImpression(data: any): Promise<{ id: string }> {
+    const impressionId = this.generateId();
+    // Store impression data - simplified implementation
+    return { id: impressionId };
+  }
+
+  async getProfileAnalytics(profileId: string): Promise<any> {
+    const tips = await this.getTipsByProfile(profileId);
+    const scans = await this.getQrScansByProfile(profileId);
+    
+    return {
+      totalTips: tips.length,
+      totalEarnings: tips.reduce((sum, tip) => sum + tip.amount, 0),
+      totalScans: scans.length,
+      conversionRate: scans.length > 0 ? (tips.length / scans.length) * 100 : 0
     };
   }
 }
