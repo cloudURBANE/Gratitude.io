@@ -31,6 +31,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
+  // Server-side entitlements endpoint for clean feature gating
+  app.get('/api/user/entitlements', async (req, res) => {
+    try {
+      // Mock user subscription - would come from database in production
+      const subscription = {
+        plan: 'free' as const,
+        status: 'active' as const,
+        trialEndsAt: undefined,
+        currentPeriodEnd: undefined
+      };
+      
+      // Server-side entitlements calculation
+      const isPro = subscription.plan === 'pro' && 
+        subscription.status === 'active';
+      
+      const entitlements = {
+        customBranding: isPro,
+        advancedAnalytics: isPro,
+        multiplePages: isPro,
+        prioritySupport: isPro,
+        noAds: isPro,
+        unlimitedTips: isPro
+      };
+      
+      res.json(entitlements);
+    } catch (error) {
+      console.error('Error fetching entitlements:', error);
+      res.status(500).json({ error: 'Failed to fetch entitlements' });
+    }
+  });
+
   // Profile endpoints
   app.get('/api/profiles/:handle', async (req, res) => {
     try {

@@ -82,21 +82,20 @@ export default function AdSlot({
   useEffect(() => {
     if (!showAds) return;
     
+    // Safe ad placement - only success page and dashboard sidebar per feedback
+    const allowedPlacements = ['success_partner_ads', 'dashboard_side'];
+    if (!allowedPlacements.includes(placement)) {
+      return;
+    }
+    
     // Get appropriate ad for placement
     const config = adService.getAdForPlacement(placement, 'free');
     if (config) {
       setAdConfig(config);
       
-      // Set ad content based on type
-      if (config.type === 'interstitial' || config.type === 'native') {
-        // Use partner ads for higher revenue
-        const partnerAd = revenuePartnerAds[Math.floor(Math.random() * revenuePartnerAds.length)];
-        setCurrentAd(partnerAd);
-      } else {
-        // Use upgrade promotions
-        const promoAd = mockAdContent[placement as keyof typeof mockAdContent];
-        setCurrentAd(promoAd);
-      }
+      // Use partner ads for relevant service worker tools
+      const partnerAd = revenuePartnerAds[Math.floor(Math.random() * revenuePartnerAds.length)];
+      setCurrentAd(partnerAd);
     }
   }, [placement, showAds]);
 
@@ -130,6 +129,12 @@ export default function AdSlot({
     setIsVisible(false);
     // Could track dismissal analytics here
   };
+
+  // Safe ad placement check - only success page and dashboard sidebar
+  const allowedPlacements = ['success_partner_ads', 'dashboard_side'];
+  if (!allowedPlacements.includes(placement)) {
+    return null;
+  }
 
   // Don't render for paid users or if no ad content
   if (!showAds || !adConfig || !currentAd || !isVisible) {
